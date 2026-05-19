@@ -1,0 +1,302 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #020607;
+  color: #ecfeff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: #020607;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  overflow-x: hidden;
+  background: #020607;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.shell {
+  min-height: 100svh;
+  background: #020607;
+}
+
+.hero {
+  position: relative;
+  min-height: 92svh;
+  display: grid;
+  align-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  border-bottom: 1px solid rgba(103, 232, 249, 0.16);
+}
+
+.stage,
+.scene,
+.veil {
+  position: absolute;
+  inset: 0;
+}
+
+.stage {
+  z-index: 0;
+}
+
+.scene {
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.veil {
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 72% 38%, rgba(11, 245, 255, 0.08), transparent 39%),
+    linear-gradient(90deg, rgba(2, 6, 7, 0.93) 0%, rgba(2, 6, 7, 0.7) 34%, rgba(2, 6, 7, 0.08) 72%, rgba(2, 6, 7, 0.36) 100%),
+    linear-gradient(180deg, rgba(2, 6, 7, 0.18), rgba(2, 6, 7, 0.12) 62%, rgba(2, 6, 7, 0.76));
+}
+
+.copy {
+  position: relative;
+  z-index: 2;
+  width: min(42rem, calc(100% - 2rem));
+  margin-left: 1rem;
+  padding-top: 4rem;
+  padding-bottom: 5rem;
+  text-shadow: 0 0 26px rgba(0, 0, 0, 0.65);
+}
+
+.eyebrow {
+  margin: 0 0 1rem;
+  color: #67e8f9;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1 {
+  max-width: 8ch;
+  margin: 0;
+  color: #ffffff;
+  font-size: 3.15rem;
+  line-height: 0.92;
+  letter-spacing: 0;
+  font-weight: 950;
+}
+
+.lede {
+  max-width: 34rem;
+  margin: 1.25rem 0 0;
+  color: rgba(236, 254, 255, 0.78);
+  font-size: 1.08rem;
+  line-height: 1.55;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 2rem;
+}
+
+.action {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(103, 232, 249, 0.44);
+  padding: 0.9rem 1.1rem;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.action:hover,
+.action:focus-visible {
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.primary {
+  background: #67e8f9;
+  color: #031314;
+  box-shadow: 0 0 30px rgba(103, 232, 249, 0.24);
+}
+
+.primary:hover,
+.primary:focus-visible {
+  background: #a5f3fc;
+  border-color: rgba(165, 243, 252, 0.9);
+}
+
+.secondary {
+  background: rgba(2, 6, 7, 0.44);
+  color: #d946ef;
+  border-color: rgba(217, 70, 239, 0.5);
+}
+
+.secondary:hover,
+.secondary:focus-visible {
+  background: rgba(217, 70, 239, 0.12);
+  border-color: rgba(217, 70, 239, 0.85);
+  color: #f5d0fe;
+}
+
+.rail {
+  position: absolute;
+  z-index: 2;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  max-width: calc(100% - 2rem);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  color: rgba(236, 254, 255, 0.58);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.rail span {
+  border: 1px solid rgba(103, 232, 249, 0.18);
+  background: rgba(2, 6, 7, 0.42);
+  padding: 0.42rem 0.55rem;
+}
+
+.reef {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  border-top: 1px solid rgba(217, 70, 239, 0.22);
+  background: rgba(103, 232, 249, 0.13);
+}
+
+.metric {
+  min-height: 11rem;
+  padding: 1.25rem;
+  background: #020607;
+}
+
+.metric span {
+  display: block;
+  color: #67e8f9;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 1rem;
+  color: #ffffff;
+  font-size: 1.25rem;
+}
+
+.metric p {
+  max-width: 22rem;
+  margin: 0.55rem 0 0;
+  color: rgba(236, 254, 255, 0.66);
+  line-height: 1.5;
+}
+
+@media (min-width: 48rem) {
+  .copy {
+    width: min(43rem, calc(100% - 6rem));
+    margin-left: 3rem;
+  }
+
+  h1 {
+    font-size: 5.4rem;
+  }
+
+  .lede {
+    font-size: 1.18rem;
+  }
+
+  .action {
+    min-width: 12.5rem;
+  }
+
+  .reef {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .metric {
+    min-height: 12rem;
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 78rem) {
+  .copy {
+    margin-left: 6rem;
+  }
+
+  h1 {
+    font-size: 6.8rem;
+  }
+
+  .rail {
+    right: 2rem;
+    bottom: 1.5rem;
+  }
+}
+
+@media (max-width: 42rem) {
+  .hero {
+    align-items: end;
+  }
+
+  .veil {
+    background:
+      linear-gradient(180deg, rgba(2, 6, 7, 0.1) 0%, rgba(2, 6, 7, 0.38) 38%, rgba(2, 6, 7, 0.95) 74%),
+      radial-gradient(ellipse at 50% 28%, rgba(11, 245, 255, 0.12), transparent 46%);
+  }
+
+  .copy {
+    padding-top: 17rem;
+    padding-bottom: 5.5rem;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .action {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
