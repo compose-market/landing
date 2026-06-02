@@ -4,16 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npm run slice && vite",
-    "build": "npm run slice && vite build",
+    "assets": "npm run artifacts",
+    "dev": "npm run assets && vite",
+    "build": "npm run assets && vite build",
     "check": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
-    "e2e": "npm run slice && playwright test",
-    "slice": "tsx scripts/slice.ts"
+    "e2e": "npm run assets && playwright test",
+    "slice": "tsx scripts/slice.ts",
+    "artifacts": "tsx scripts/artifacts.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
-    "@types/node": "^25.9.0",
+    "@types/node": "^25.9.1",
     "@types/three": "^0.184.1",
     "sharp": "^0.34.5",
     "tsx": "^4.22.3",
@@ -21,6 +23,7 @@
     "vite": "^8.0.13"
   },
   "dependencies": {
+    "@compose-market/theme": "^0.0.90",
     "three": "^0.184.0"
   }
 }

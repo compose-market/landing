@@ -1,0 +1,222 @@
+/*
+ * Exportable Compose.Market landing primitives.
+ *
+ * Move target after approval:
+ * - packages/theme/src/effects/styles.ts for .cm-* effect classes
+ * - packages/theme/src/tokens/* for the custom properties below
+ *
+ * Keep page-only layout in style.css.
+ */
+
+:root {
+  color-scheme: dark;
+  --cm-bg: #0c1324;
+  --cm-bg-deep: #020607;
+  --cm-surface: rgba(21, 27, 45, 0.42);
+  --cm-surface-high: rgba(46, 52, 71, 0.46);
+  --cm-cyan: #22d3ee;
+  --cm-cyan-hot: #00e5ff;
+  --cm-fuchsia: #ae05c6;
+  --cm-fuchsia-hot: #fbabff;
+  --cm-text: #dce1fb;
+  --cm-muted: rgba(220, 225, 251, 0.68);
+  --cm-line: rgba(138, 235, 255, 0.22);
+  --cm-purple-line: rgba(251, 171, 255, 0.24);
+  --cm-radius: 12px;
+  --cm-font-display: Orbitron, Rajdhani, Inter, ui-sans-serif, system-ui, sans-serif;
+  --cm-font-sans: Rajdhani, Inter, ui-sans-serif, system-ui, sans-serif;
+  --cm-font-mono: "Fira Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --cm-glow-cyan: 0 0 18px rgba(0, 229, 255, 0.32), 0 0 42px rgba(0, 139, 212, 0.16);
+  --cm-glow-fuchsia: 0 0 16px rgba(156, 39, 176, 0.32), 0 0 36px rgba(123, 31, 162, 0.18);
+}
+
+.cm-grid {
+  background-image:
+    linear-gradient(to right, rgba(34, 211, 238, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34, 211, 238, 0.03) 1px, transparent 1px),
+    radial-gradient(circle at 50% 0%, rgba(34, 211, 238, 0.1), transparent 34rem);
+  background-size: 44px 44px, 44px 44px, 100% 100%;
+}
+
+.cm-glass {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(138, 235, 255, 0.16);
+  border-radius: var(--cm-radius);
+  background:
+    linear-gradient(145deg, rgba(46, 52, 71, 0.34), rgba(12, 19, 36, 0.2)),
+    rgba(21, 27, 45, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(34, 211, 238, 0.08),
+    0 0 28px rgba(34, 211, 238, 0.045);
+  backdrop-filter: blur(18px) saturate(1.18);
+}
+
+.cm-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.16), transparent 18%),
+    radial-gradient(circle at 18% 12%, rgba(0, 229, 255, 0.16), transparent 34%),
+    radial-gradient(circle at 100% 100%, rgba(174, 5, 198, 0.16), transparent 38%);
+  opacity: 0.46;
+}
+
+.cm-glass > * {
+  position: relative;
+  z-index: 1;
+}
+
+.cm-cell {
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    background-color 180ms ease;
+}
+
+.cm-cell:hover,
+.cm-cell:focus-within,
+.cm-cell[data-state="active"] {
+  border-color: rgba(0, 229, 255, 0.8);
+  box-shadow:
+    inset 0 0 30px rgba(0, 229, 255, 0.08),
+    0 0 18px rgba(0, 229, 255, 0.36),
+    0 0 38px rgba(0, 139, 212, 0.18);
+  transform: translateY(-1px);
+}
+
+.cm-cell[data-tone="purple"] {
+  border-color: rgba(174, 5, 198, 0.48);
+  box-shadow:
+    inset 0 0 26px rgba(174, 5, 198, 0.1),
+    0 0 10px rgba(156, 39, 176, 0.42);
+}
+
+.cm-kicker {
+  margin: 0;
+  color: var(--cm-cyan-hot);
+  font-family: var(--cm-font-mono);
+  font-size: clamp(0.62rem, 1vw, 0.82rem);
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  text-shadow: var(--cm-glow-cyan);
+}
+
+.cm-display {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.96);
+  font-family: var(--cm-font-display);
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 0.86;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 12px rgba(255, 255, 255, 0.42),
+    0 0 26px rgba(0, 229, 255, 0.34);
+}
+
+.cm-display em {
+  color: var(--cm-cyan-hot);
+  font-style: normal;
+  text-shadow:
+    0 0 12px rgba(0, 229, 255, 0.9),
+    0 0 34px rgba(0, 229, 255, 0.58),
+    0 0 52px rgba(174, 5, 198, 0.28);
+}
+
+.cm-copy {
+  color: var(--cm-muted);
+  font-family: var(--cm-font-sans);
+  font-weight: 500;
+  line-height: 1.42;
+}
+
+.cm-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(138, 235, 255, 0.42);
+  border-radius: var(--cm-radius);
+  padding: 0.82rem 1.15rem;
+  font-family: var(--cm-font-mono);
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.cm-button:hover,
+.cm-button:focus-visible {
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.cm-button-primary,
+.primary {
+  border-color: rgba(138, 235, 255, 0.9);
+  background: linear-gradient(135deg, #8aebff, #00e5ff);
+  color: #031314;
+  box-shadow: var(--cm-glow-cyan);
+}
+
+.cm-button-secondary,
+.secondary {
+  border-color: rgba(138, 235, 255, 0.38);
+  background: rgba(12, 19, 36, 0.44);
+  color: #dce1fb;
+  box-shadow: inset 0 0 22px rgba(0, 229, 255, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.cm-button-secondary:hover,
+.cm-button-secondary:focus-visible,
+.secondary:hover,
+.secondary:focus-visible {
+  border-color: rgba(0, 229, 255, 0.74);
+  box-shadow: var(--cm-glow-cyan);
+}
+
+.cm-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(138, 235, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(12, 19, 36, 0.42);
+  color: rgba(220, 225, 251, 0.72);
+  padding: 0.36rem 0.58rem;
+  font-family: var(--cm-font-mono);
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  backdrop-filter: blur(12px);
+}
+
+.cm-icon {
+  display: inline-grid;
+  width: 2.45rem;
+  height: 2.45rem;
+  place-items: center;
+  border: 1px solid rgba(0, 229, 255, 0.28);
+  border-radius: var(--cm-radius);
+  background: rgba(0, 229, 255, 0.08);
+  color: var(--cm-cyan-hot);
+  font-family: var(--cm-font-mono);
+  font-size: 0.8rem;
+  font-weight: 900;
+  box-shadow: inset 0 0 20px rgba(0, 229, 255, 0.1);
+}

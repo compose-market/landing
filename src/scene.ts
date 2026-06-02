@@ -25,6 +25,8 @@ export type Mount = {
 
 export type MountOptions = {
   image?: string;
+  tentacles?: string;
+  cords?: string[];
   market?: string;
   compose?: string;
   reduced?: boolean;
@@ -48,6 +50,12 @@ type Bounds = {
   h: number;
 };
 
+type Zone = "head" | "cord" | "braid" | "thread";
+
+type Wake = Vec & {
+  zone: Zone;
+};
+
 type Ribbon = {
   strand: Strand;
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
@@ -55,6 +63,20 @@ type Ribbon = {
   side: THREE.BufferAttribute;
   along: THREE.BufferAttribute;
   shade: THREE.BufferAttribute;
+  family: "vine" | "lace" | "braid" | "flow";
+};
+
+type Cord = {
+  mesh: THREE.Mesh<THREE.PlaneGeometry, SceneMaterial>;
+  root: number;
+  length: number;
+  width: number;
+  phase: number;
+  depth: number;
+  sway: number;
+  base: Vec;
+  size: Vec;
+  rot: number;
 };
 
 type SceneMaterial = THREE.ShaderMaterial & {
@@ -71,6 +93,37 @@ const smooth = (value: number) => {
 };
 
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+
+function spin(point: Vec, origin: Vec, angle: number): Vec {
+  const dx = point.x - origin.x;
+  const dy = point.y - origin.y;
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return {
+    x: origin.x + dx * c - dy * s,
+    y: origin.y + dx * s + dy * c
+  };
+}
+
+function sample(parts: Part[], index: number, radius: number): Vec {
+  if (radius <= 0) {
+    return parts[index];
+  }
+
+  let x = 0;
+  let y = 0;
+  let total = 0;
+
+  for (let offset = -radius; offset <= radius; offset += 1) {
+    const part = parts[clamp(index + offset, 0, parts.length - 1)];
+    const weight = radius + 1 - Math.abs(offset);
+    x += part.x * weight;
+    y += part.y * weight;
+    total += weight;
+  }
+
+  return { x: x / total, y: y / total };
+}
 
 function tint(a: number, b: number, t: number) {
   return new THREE.Color(a).lerp(new THREE.Color(b), t);
@@ -216,14 +269,14 @@ export class Strand {
 
   step(dt: number, target: Hit | null, active = 0, reduced = false, time = 0, bounds?: Bounds) {
     const rate = clamp(dt * 60, 0.25, 2);
-    const want = reduced ? 0.66 : 0.72 + active * 0.9;
+    const want = reduced ? 0.66 : 0.72 + active * 1.36;
     this.reach += (want - this.reach) * (reduced ? 0.025 : 0.074) * rate;
 
     const drag = reduced ? 0.84 : 0.908;
     const pullTarget = target && !reduced && active > 0.01
       ? {
           x: target.x,
-          y: Math.max(target.y, this.root.y + 44)
+          y: target.y
         }
       : null;
 
@@ -240,18 +293,22 @@ export class Strand {
       const wave = Math.sin(time * 0.00115 + this.phase + along * (7.2 + this.curl * 2.4));
       const slow = Math.sin(time * 0.00042 + this.phase * 1.7 + along * 2.8);
       const cross = Math.cos(time * 0.00077 + this.phase * 0.7 + along * 4);
-      const current = reduced ? 0.09 : 1;
+      const depth = clamp((part.y - this.root.y) / Math.max(1, this.base), 0, 1);
+      const eddy = Math.sin(time * 0.00024 + this.phase * 2.3 + depth * 5.7);
+      const current = reduced ? 0.09 : 0.82 + depth * 0.28;
 
       part.px = part.x;
       part.py = part.y;
-      part.x += vx + (wave * 0.86 + cross * 0.36 + slow * this.curl * 0.58 + this.lean * 0.08) * current * rate;
-      part.y += vy + (0.1 + along * 0.15) * current * rate;
+      part.x += vx + (wave * 0.62 + cross * 0.25 + slow * this.curl * 0.48 + eddy * 0.34 + this.lean * 0.07) * current * rate;
+      part.y += vy + (0.08 + along * 0.12 + Math.abs(eddy) * 0.022) * current * rate;
 
       if (pullTarget) {
-        const pull = active * along ** 2.16 * 0.105 * rate;
-        const spread = Math.sin(this.phase) * 34 * along * active;
+        const lag = smooth(along * 0.88 + Math.sin(this.phase + time * 0.00038) * 0.08);
+        const pull = active * lag ** 2.05 * 0.092 * rate;
+        const spread = Math.sin(this.phase + along * 2.7) * 58 * along * active;
+        const lift = Math.sin(time * 0.00062 + this.phase + along * 3.8) * 30 * active * along;
         part.x += (pullTarget.x + spread - part.x) * pull;
-        part.y += (pullTarget.y - part.y) * pull;
+        part.y += (pullTarget.y + lift - part.y) * pull * 0.82;
       }
 
       if (bounds) {
@@ -294,10 +351,10 @@ export class Strand {
 
 function body(w: number, h: number): Body {
   const wide = w >= 860;
-  const bw = clamp(w * (wide ? 0.48 : 0.9), 340, 730);
+  const bw = clamp(w * (wide ? 0.46 : 0.82), 320, 700);
   const bh = bw * 0.42;
-  const cx = wide ? w * 0.68 : w * 0.52;
-  const y = wide ? h * 0.105 : h * 0.045;
+  const cx = w * 0.5;
+  const y = wide ? h * 0.22 : h * 0.25;
   return { x: cx - bw * 0.5, y, w: bw, h: bh };
 }
 
@@ -532,6 +589,180 @@ function bodyMaterial(map: THREE.Texture): SceneMaterial {
   }) as SceneMaterial;
 }
 
+function cordMaterial(map: THREE.Texture): SceneMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.DoubleSide,
+    blending: THREE.NormalBlending,
+    uniforms: {
+      uMap: { value: map },
+      uTime: { value: 0 },
+      uStill: { value: 0 },
+      uSeed: { value: 0 },
+      uActive: { value: 0 },
+      uTop: { value: 0 }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying float vEdge;
+      varying float vHang;
+      uniform float uTime;
+      uniform float uStill;
+      uniform float uSeed;
+      uniform float uActive;
+      uniform float uTop;
+
+      void main() {
+        vUv = vec2(uv.x, mix(uTop, 1.0, uv.y));
+        vec3 p = position;
+        vHang = clamp(p.y, 0.0, 1.0);
+        float hang = vHang;
+        float free = smoothstep(0.14, 0.28, hang);
+        float side = uv.x - 0.5;
+        float flow = mix(1.0, 0.22, uStill);
+        float react = uActive * (1.0 - uStill);
+        float wide = smoothstep(0.16, 0.92, hang);
+        float body = pow(hang, 1.18);
+        float curl = sin(uTime * 0.58 + uSeed + hang * 6.2) * (0.042 + react * 0.22);
+        float tide = sin(uTime * 0.31 + uSeed * 1.7 + hang * 10.4) * (0.026 + react * 0.16);
+        float tremor = sin(uTime * 1.25 + uSeed * 0.6 + hang * 18.0) * (0.011 + react * 0.05);
+        float reach = sin(uTime * 1.02 + uSeed * 0.7 + hang * 8.2) * 0.48 * react * wide;
+        float sideCurl = side * sin(uTime * 0.76 + uSeed * 0.4 + hang * 5.6) * 0.22 * react * body;
+        p.x += (curl + tide + tremor + reach + sideCurl) * wide * free * flow;
+        p.z += (sin(uTime * 0.42 + uSeed + hang * 5.0) * 0.052 * hang + abs(side) * 0.024 + react * hang * 0.34) * free * flow;
+        p.y += (sin(uTime * 0.24 + uSeed + hang * 3.7) * 0.022 * hang + react * hang * 0.16) * free * flow;
+        vEdge = 1.0 - smoothstep(0.28, 0.5, abs(side));
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      }
+    `,
+    fragmentShader: `
+      precision highp float;
+
+      varying vec2 vUv;
+      varying float vEdge;
+      varying float vHang;
+      uniform sampler2D uMap;
+      uniform float uTime;
+      uniform float uSeed;
+      uniform float uActive;
+
+      float band(float x) {
+        return pow(max(0.0, sin(x)), 14.0);
+      }
+
+      void main() {
+        vec2 uv = vUv;
+        float hang = clamp(vHang, 0.0, 1.0);
+        float free = smoothstep(0.14, 0.28, hang);
+        uv.x += sin(uTime * 0.16 + uSeed + hang * 5.8) * (0.006 + uActive * 0.008) * free;
+        vec4 tex = texture2D(uMap, clamp(uv, 0.0, 1.0));
+        float mask = smoothstep(0.18, 0.46, tex.a);
+        if (mask <= 0.002) {
+          discard;
+        }
+        float end = 1.0;
+        float root = 1.0 - smoothstep(0.18, 0.28, hang);
+        float gloss = band(hang * 34.0 - uTime * 0.48 + uSeed) * (0.08 + uActive * 0.08) * free;
+        float rootGlass = band(hang * 28.0 + uSeed * 0.7) * 0.035 * root;
+        float pearl = pow(vEdge, 4.0) * 0.045;
+        vec3 cyan = vec3(0.0, 0.9, 1.0);
+        vec3 violet = vec3(0.64, 0.13, 1.0);
+        vec3 color = tex.rgb * 1.04;
+        color += mix(cyan, violet, clamp(tex.r + uSeed * 0.04, 0.0, 1.0)) * (gloss + rootGlass + pearl + root * 0.12 + uActive * 0.12 * hang * free);
+        float alpha = tex.a * mask * end * (0.66 + gloss * 0.22 + rootGlass + pearl + root * 0.08 + uActive * 0.16 * free);
+        gl_FragColor = vec4(color, clamp(alpha, 0.0, 0.8));
+      }
+    `
+  }) as SceneMaterial;
+}
+
+function shadowMaterial(): SceneMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.NormalBlending,
+    uniforms: {
+      uTime: { value: 0 },
+      uActive: { value: 0 }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      precision highp float;
+      varying vec2 vUv;
+      uniform float uTime;
+      uniform float uActive;
+
+      void main() {
+        vec2 p = (vUv - 0.5) / vec2(0.72, 0.28);
+        float core = exp(-dot(p, p) * 2.4);
+        float caustic = pow(max(0.0, sin((vUv.x + vUv.y * 0.35) * 48.0 + uTime * 0.9)), 18.0);
+        vec3 color = vec3(0.02, 0.22, 0.28) * core + vec3(0.0, 0.8, 1.0) * caustic * core * 0.16;
+        float alpha = core * (0.18 + uActive * 0.06);
+        gl_FragColor = vec4(color, alpha);
+      }
+    `
+  }) as SceneMaterial;
+}
+
+function mistMaterial(): SceneMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uTime: { value: 0 },
+      uActive: { value: 0 },
+      uResolution: { value: new THREE.Vector2(1, 1) }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      precision highp float;
+      varying vec2 vUv;
+      uniform float uTime;
+      uniform float uActive;
+      uniform vec2 uResolution;
+
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(41.7, 289.3))) * 43758.5453);
+      }
+
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+      }
+
+      void main() {
+        vec2 ratio = vec2(uResolution.x / max(1.0, uResolution.y), 1.0);
+        vec2 p = (vUv - 0.5) * ratio;
+        float shaft = (1.0 - smoothstep(0.12, 0.92, vUv.y)) * smoothstep(-0.55, 0.28, p.x) * (1.0 - smoothstep(0.15, 0.9, p.x));
+        float rays = pow(max(0.0, sin((p.x + p.y * 0.42) * 16.0 + uTime * 0.18)), 8.0);
+        float haze = noise(p * 3.2 + vec2(uTime * 0.025, -uTime * 0.018));
+        vec3 color = vec3(0.06, 0.72, 0.9) * shaft * (0.04 + rays * 0.05 + haze * 0.025);
+        color += vec3(0.78, 0.22, 1.0) * haze * 0.012 * (1.0 - smoothstep(0.12, 0.85, vUv.y));
+        gl_FragColor = vec4(color, 0.38 + uActive * 0.18);
+      }
+    `
+  }) as SceneMaterial;
+}
+
 function crestMaterial(): SceneMaterial {
   return new THREE.ShaderMaterial({
     transparent: true,
@@ -675,6 +906,65 @@ function strandMaterial(): SceneMaterial {
   }) as SceneMaterial;
 }
 
+function braidMaterial(): SceneMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uTime: { value: 0 },
+      uActive: { value: 0 }
+    },
+    vertexShader: `
+      attribute float aSide;
+      attribute float aAlong;
+      attribute float aShade;
+      varying float vSide;
+      varying float vAlong;
+      varying float vShade;
+
+      void main() {
+        vSide = aSide;
+        vAlong = aAlong;
+        vShade = aShade;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      precision highp float;
+
+      varying float vSide;
+      varying float vAlong;
+      varying float vShade;
+      uniform float uTime;
+      uniform float uActive;
+
+      void main() {
+        float side = abs(vSide);
+        float core = pow(1.0 - side, 1.15);
+        float edge = pow(1.0 - side, 6.0);
+        float taper = pow(1.0 - vAlong, 0.34);
+        float joints = pow(max(0.0, sin(vAlong * 118.0 + vShade * 8.0)), 14.0);
+        float helix = pow(max(0.0, sin(vAlong * 46.0 + vSide * 5.4 - uTime * 1.2)), 8.0);
+        float wet = pow(max(0.0, sin(vAlong * 19.0 - uTime * 0.7 + vShade * 4.0)), 18.0);
+        vec3 midnight = vec3(0.015, 0.07, 0.28);
+        vec3 blue = vec3(0.04, 0.28, 0.92);
+        vec3 cyan = vec3(0.20, 0.94, 1.0);
+        vec3 violet = vec3(0.56, 0.12, 1.0);
+        vec3 pearl = vec3(0.92, 0.98, 1.0);
+        vec3 color = mix(blue, violet, vShade * 0.68);
+        color = mix(midnight, color, core);
+        color += cyan * (edge * 0.18 + helix * 0.24);
+        color += pearl * (joints * 0.72 + wet * 0.42);
+        float alpha = (0.18 + core * 0.5 + joints * 0.26 + helix * 0.18 + wet * 0.16) * taper;
+        alpha *= 0.72 + uActive * 0.38;
+        gl_FragColor = vec4(color, clamp(alpha, 0.0, 0.88));
+      }
+    `
+  }) as SceneMaterial;
+}
+
 function pointTexture(): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
   const size = 128;
@@ -765,7 +1055,7 @@ function sailGeometry() {
   return geometry;
 }
 
-function createRibbon(strand: Strand, material: SceneMaterial) {
+function createRibbon(strand: Strand, material: SceneMaterial, family: Ribbon["family"] = "vine") {
   const count = strand.parts.length;
   const positions = new Float32Array(count * 2 * 3);
   const sides = new Float32Array(count * 2);
@@ -801,7 +1091,7 @@ function createRibbon(strand: Strand, material: SceneMaterial) {
   geometry.setIndex(indices);
 
   const mesh = new THREE.Mesh(geometry, material);
-  mesh.renderOrder = 3;
+  mesh.renderOrder = family === "flow" ? 1.7 : family === "lace" ? 4.2 : family === "braid" ? 3.85 : 3;
 
   return {
     strand,
@@ -809,7 +1099,8 @@ function createRibbon(strand: Strand, material: SceneMaterial) {
     position,
     side,
     along,
-    shade
+    shade,
+    family
   };
 }
 
@@ -818,17 +1109,26 @@ function updateRibbon(ribbon: Ribbon, active: number) {
   const values = position.array as Float32Array;
 
   for (let i = 0; i < strand.parts.length; i += 1) {
-    const p = strand.parts[i];
-    const prev = strand.parts[Math.max(0, i - 1)];
-    const next = strand.parts[Math.min(strand.parts.length - 1, i + 1)];
+    const smoothness = ribbon.family === "braid" ? 2 : 0;
+    const p = sample(strand.parts, i, smoothness);
+    const prev = sample(strand.parts, Math.max(0, i - (smoothness ? 2 : 1)), smoothness);
+    const next = sample(strand.parts, Math.min(strand.parts.length - 1, i + (smoothness ? 2 : 1)), smoothness);
     const dx = next.x - prev.x;
     const dy = next.y - prev.y;
     const len = Math.hypot(dx, dy) || 1;
     const nx = -dy / len;
     const ny = dx / len;
     const t = i / Math.max(1, strand.parts.length - 1);
-    const width = strand.width * (1.2 + active * 0.5) * (1 - t * 0.62) + 0.28;
-    const z = 8 + strand.depth + Math.sin(t * Math.PI + strand.phase) * 22;
+    const taper = ribbon.family === "lace"
+      ? 1 - t * 0.76
+      : ribbon.family === "braid"
+        ? 1 - t * 0.48
+        : ribbon.family === "flow"
+          ? 1 - t * 0.4
+          : 1 - t * 0.66;
+    const response = ribbon.family === "braid" ? 0.28 : ribbon.family === "lace" ? 0.32 : 0.46;
+    const width = strand.width * (1.12 + active * response) * taper + (ribbon.family === "braid" ? 0.44 : ribbon.family === "lace" ? 0.18 : 0.24);
+    const z = 8 + strand.depth + Math.sin(t * Math.PI + strand.phase) * (ribbon.family === "lace" ? 12 : 22);
     const base = i * 6;
 
     values[base] = p.x + nx * width;
@@ -851,16 +1151,16 @@ function updateBeads(geometry: THREE.BufferGeometry, ribbons: Ribbon[], active: 
 
   for (const ribbon of ribbons) {
     const { strand } = ribbon;
-    const every = strand.width > 2.3 ? 3 : 7;
+      const every = ribbon.family === "braid" ? 3 : ribbon.family === "lace" ? 4 : strand.width > 2.3 ? 5 : 8;
 
     for (let i = 3; i < strand.parts.length; i += every) {
       const p = strand.parts[i];
       const t = i / Math.max(1, strand.parts.length - 1);
-      const bead = 0.45 + active * 0.65;
+      const bead = ribbon.family === "braid" ? 0.76 + active * 0.36 : ribbon.family === "lace" ? 0.62 + active * 0.44 : 0.36 + active * 0.54;
       const glint = Math.sin(time * 0.006 + strand.phase + t * 20) * bead;
       const c = tint(0x39f4ff, 0xa955ff, strand.color);
       const base = cursor * 3;
-      positions[base] = p.x + Math.sin(strand.phase + i) * strand.width * (0.8 + active);
+      positions[base] = p.x + Math.sin(strand.phase + i) * strand.width * (0.72 + active * 0.72);
       positions[base + 1] = p.y;
       positions[base + 2] = 20 + strand.depth + Math.sin(t * Math.PI + strand.phase) * 24;
       colors[base] = c.r + glint * 0.18;
@@ -885,42 +1185,172 @@ function updateBeads(geometry: THREE.BufferGeometry, ribbons: Ribbon[], active: 
 
 export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
   const image = options.image ?? "/manowar.png";
+  const tentaclesImage = options.tentacles ?? "/artifacts/tentacles.png";
+  const cordImages = options.cords ?? ["/artifacts/cord-01.png", "/artifacts/cord-02.png", "/artifacts/cord-03.png"];
   const market = options.market ?? "/market";
   const compose = options.compose ?? "/compose";
 
   root.innerHTML = `
-    <main class="shell">
-      <section class="hero" aria-label="Compose.Market Manowar landing">
+    <main class="shell cm-app-shell">
+      <div class="backdrop cm-app-shell__backdrop" aria-hidden="true">
+        <div class="cm-app-shell__grid bg-grid-pattern"></div>
+        <div class="cm-app-shell__gradient"></div>
+        <div class="cm-app-shell__scanline"></div>
         <div class="stage" aria-hidden="true"></div>
         <div class="veil" aria-hidden="true"></div>
-        <div class="copy">
-          <p class="eyebrow">PHYSALIA INTERFACE</p>
-          <h1>COMPOSE.<br />MARKET</h1>
-          <p class="lede">Create, lease, and compose autonomous agents in a living market powered by the Manowar framework.</p>
+      </div>
+
+      <div class="scroll cm-app-shell__content">
+      <section class="panel hero cm-grid" aria-label="Compose.Market Manowar landing">
+        <div class="hero-title">
+          <p class="cm-kicker">Symbiotic Superintelligence</p>
+          <h1 class="cm-display">COMPOSE<br /><em>THE FUTURE</em></h1>
+        </div>
+
+        <article class="float-card card-a cm-glass cm-cell" aria-label="Agent mesh">
+          <p class="cm-kicker">03</p>
+          <p class="cm-copy">Agents observe, negotiate access, compose services, and settle through protocol-native identity and payments.</p>
+        </article>
+        <article class="float-card card-b cm-glass cm-cell" aria-label="Activation state" data-state="active">
+          <p class="cm-kicker">Activated</p>
+          <p class="cm-copy">Block hover locks the target region and pulls the live tentacle chains into flow.</p>
+        </article>
+        <article class="float-card card-c cm-glass cm-cell" aria-label="Payment state">
+          <p class="cm-kicker">Payment</p>
+          <p class="cm-copy">x402 routes budgets across composed autonomous services.</p>
+        </article>
+        <article class="card-chip chip-a cm-glass cm-cell" data-tone="purple" aria-hidden="true">
+          <strong>Secure</strong>
+          <span>ERC8004</span>
+        </article>
+        <article class="card-chip chip-b cm-glass cm-cell" aria-hidden="true">
+          <strong>Synced</strong>
+          <span>x402 flow</span>
+        </article>
+
+        <div class="hero-mid">
+          <p class="lede cm-copy">compose.market is marketplace for autonomous agents. Create, lease, and compose AI workflows powered by the Manowar Framework.</p>
+          <p class="protocol">ERC8004 Identity &amp; x402 Payments on Avalanche</p>
           <div class="actions" aria-label="Primary actions">
-            <a class="action primary" href="${market}">Explore Market</a>
-            <a class="action secondary" href="${compose}">Open Composer</a>
+            <a class="action cm-button cm-button-primary primary" href="${market}">Explore Market <span aria-hidden="true">-&gt;</span></a>
+            <a class="action cm-button cm-button-secondary secondary" href="${compose}">Start Composing</a>
           </div>
         </div>
+
         <div class="rail" aria-hidden="true">
-          <span>ERC8004</span>
-          <span>x402</span>
-          <span>Agents</span>
-          <span>Workflows</span>
+          <span class="cm-chip">ERC8004</span>
+          <span class="cm-chip">x402</span>
+          <span class="cm-chip">Agents</span>
+          <span class="cm-chip">Workflows</span>
         </div>
       </section>
-      <section class="reef" aria-label="Protocol highlights">
-        <div class="metric"><span>01</span><strong>Identity</strong><p>Agents own reputation and provenance on-chain.</p></div>
-        <div class="metric"><span>02</span><strong>Payments</strong><p>Native x402 flows keep composed services liquid.</p></div>
-        <div class="metric"><span>03</span><strong>Composition</strong><p>Build workflows that behave like networked organisms.</p></div>
-      </section>
+
+        <section class="panel deck-panel" aria-label="Protocol highlights">
+          <div class="panel-copy band cm-glass neon-border">
+            <p class="cm-kicker">Living protocol surface</p>
+            <h2 class="cm-display">EVERY BLOCK<br /><em>CONNECTED</em></h2>
+            <p class="cm-copy">Each panel is part of the same organism: the background grid, luminescence, and Man O War remain locked while the product surface scrolls through it.</p>
+          </div>
+          <div class="features band">
+          <article class="feature cm-glass cm-cell">
+            <span class="cm-icon">01</span>
+            <h3>ERC8004 Identity</h3>
+            <p class="cm-copy">Agents own their reputation. On-chain verification keeps provenance attached to autonomous services.</p>
+          </article>
+          <article class="feature cm-glass cm-cell" data-state="active">
+            <span class="cm-icon">02</span>
+            <h3>x402 Payments</h3>
+            <p class="cm-copy">Native streaming payments let agents pay agents autonomously for composed services rendered.</p>
+          </article>
+          <article class="feature cm-glass cm-cell">
+            <span class="cm-icon">03</span>
+            <h3>Composable Workflows</h3>
+            <p class="cm-copy">Mint complex logic as Nested NFTs and lease entire swarms through a single living interface.</p>
+          </article>
+          </div>
+        </section>
+
+        <section class="panel metrics-panel" aria-label="Network metrics">
+          <div class="stats band cm-glass neon-border">
+          <div class="stat"><span>Total Agents</span><strong>54</strong><p class="cm-copy">+2 past 24h</p></div>
+          <div class="stat"><span>x402 Workflows</span><strong>5885</strong><p class="cm-copy">+35 past 24h</p></div>
+          <div class="stat"><span>Downloads</span><strong>2258</strong><p class="cm-copy">+26 past 24h</p></div>
+          </div>
+        </section>
+
+        <section class="panel workflow-panel" aria-label="Composer workflow">
+        <div class="workflow band cm-glass neon-border">
+          <div>
+            <p class="cm-kicker">Composer Mesh</p>
+            <h2 class="cm-display">COMPOSE THE <em>HIVE MIND</em></h2>
+            <p class="cm-copy">Drag agents into a canvas, link their inputs and outputs, then deploy the full configuration to Manowar Protocol.</p>
+            <div class="steps">
+              <div class="step"><span class="cm-icon">01</span><span>Select specialized agents across finance, social, code, and data.</span></div>
+              <div class="step"><span class="cm-icon">02</span><span>Connect logic pipes and budget limits with x402 settlement.</span></div>
+              <div class="step"><span class="cm-icon">03</span><span>Deploy, lease, and earn royalties from reusable compositions.</span></div>
+            </div>
+          </div>
+          <div class="composer cm-glass" aria-hidden="true">
+            <svg class="wire" viewBox="0 0 620 360" preserveAspectRatio="none">
+              <path d="M125 78 C 270 78, 230 180, 340 180" />
+              <path d="M380 205 C 470 212, 438 292, 535 292" />
+            </svg>
+            <div class="module module-a cm-glass cm-cell"><span>Input Source</span><strong>Twitter_Stream</strong></div>
+            <div class="module module-b cm-glass cm-cell" data-state="active"><span>Processor</span><strong>GPT-5_Analysis</strong></div>
+            <div class="module module-c cm-glass cm-cell"><span>Action</span><strong>Exec_Trade</strong></div>
+          </div>
+        </div>
+        </section>
+
+        <section class="panel partners-panel" aria-label="Partners">
+          <div class="partners band cm-glass neon-border">
+          <p class="cm-kicker">Backed by the leaders building AI</p>
+          <h2 class="cm-display">NETWORK <em>ALLIES</em></h2>
+          <div class="logos">
+            <span class="logo cm-glass">NVIDIA</span>
+            <span class="logo cm-glass">Microsoft</span>
+            <span class="logo cm-glass">Algolia</span>
+            <span class="logo cm-glass">Alibaba Cloud</span>
+            <span class="logo cm-glass">Anam</span>
+            <span class="logo cm-glass">Apify</span>
+            <span class="logo cm-glass">Avalanche</span>
+            <span class="logo cm-glass">Vertex AI</span>
+            <span class="logo cm-glass">Intercom</span>
+            <span class="logo cm-glass">LangChain</span>
+            <span class="logo cm-glass">Linkup</span>
+            <span class="logo cm-glass">Massive</span>
+          </div>
+          </div>
+        </section>
+
+        <section class="panel final-panel" aria-label="Final call to action">
+        <div class="final band cm-glass neon-border">
+          <div>
+            <p class="cm-kicker">Ready to evolve?</p>
+            <h2 class="cm-display">MINT AN <em>AGENT</em></h2>
+            <p class="cm-copy">Join the symbiotic network. Deploy your agent or compose a new organism today.</p>
+          </div>
+          <a class="cm-button cm-button-primary" href="/create-agent">Mint Agent <span aria-hidden="true">-&gt;</span></a>
+        </div>
+        </section>
+
+        <footer class="footer band panel-foot">
+          <nav aria-label="Footer links">
+            <a href="https://docs.compose.market">Docs</a>
+            <a href="https://github.com/compose-market">GitHub</a>
+            <a href="https://x.com/compose_market">X</a>
+          </nav>
+          <span>COMPOSE.MARKET &copy; 2026</span>
+        </footer>
+      </div>
     </main>
   `;
 
-  const hero = root.querySelector<HTMLElement>(".hero");
+  const hero = root.querySelector<HTMLElement>(".shell");
+  const panel = root.querySelector<HTMLElement>(".hero");
   const stage = root.querySelector<HTMLElement>(".stage");
 
-  if (!hero || !stage) {
+  if (!hero || !panel || !stage) {
     throw new Error("Unable to mount Manowar scene");
   }
 
@@ -951,6 +1381,11 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
   seaMesh.renderOrder = 0;
   scene.add(seaMesh);
 
+  const mist = mistMaterial();
+  const mistMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mist);
+  mistMesh.renderOrder = 0.8;
+  scene.add(mistMesh);
+
   const texture = new THREE.TextureLoader().load(image);
   texture.flipY = false;
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -958,10 +1393,37 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.magFilter = THREE.LinearFilter;
 
+  const tentaclesTexture = new THREE.TextureLoader().load(tentaclesImage);
+  tentaclesTexture.flipY = false;
+  tentaclesTexture.colorSpace = THREE.SRGBColorSpace;
+  tentaclesTexture.generateMipmaps = true;
+  tentaclesTexture.minFilter = THREE.LinearMipmapLinearFilter;
+  tentaclesTexture.magFilter = THREE.LinearFilter;
+
+  const cordTextures = cordImages.map((path) => {
+    const cordTexture = new THREE.TextureLoader().load(path);
+    cordTexture.flipY = false;
+    cordTexture.colorSpace = THREE.SRGBColorSpace;
+    cordTexture.generateMipmaps = true;
+    cordTexture.minFilter = THREE.LinearMipmapLinearFilter;
+    cordTexture.magFilter = THREE.LinearFilter;
+    return cordTexture;
+  });
+
   const bodyMat = bodyMaterial(texture);
   const float = new THREE.Mesh(bodyGeometry(), bodyMat);
   float.renderOrder = 5;
   scene.add(float);
+
+  const shadowMat = shadowMaterial();
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), shadowMat);
+  shadow.renderOrder = 2.1;
+  scene.add(shadow);
+
+  const sheetMat = cordMaterial(tentaclesTexture);
+  const sheet = new THREE.Mesh(new THREE.PlaneGeometry(1, 1, 32, 96), sheetMat);
+  sheet.renderOrder = 3.25;
+  scene.add(sheet);
 
   const sailMat = sailMaterial();
   const sail = new THREE.Mesh(sailGeometry(), sailMat);
@@ -973,10 +1435,19 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
   const gridGroup = new THREE.Group();
   scene.add(gridGroup);
 
+  const flowGroup = new THREE.Group();
+  scene.add(flowGroup);
+
   const tentacleGroup = new THREE.Group();
   scene.add(tentacleGroup);
 
+  const cordGroup = new THREE.Group();
+  scene.add(cordGroup);
+
+  const flowMat = strandMaterial();
   const strandMat = strandMaterial();
+  const braidMat = braidMaterial();
+  const cordMat = cordTextures[0] ? cordMaterial(cordTextures[0]) : null;
   const beadGeometry = new THREE.BufferGeometry();
   const beadMaterial = new THREE.PointsMaterial({
     size: testing ? 3.2 : 5.4,
@@ -994,10 +1465,19 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
   let grid = net(1, 1);
   let hover: Vec | null = null;
   let tap: Vec | null = null;
+  let wake: Wake | null = null;
+  let poke: Wake | null = null;
   let tapUntil = 0;
+  let pokeUntil = 0;
   let hit: Hit | null = null;
+  let head = 0;
+  let cord = 0;
+  let braid = 0;
+  let line = 0;
   let b: Body = { x: 0, y: 0, w: 1, h: 1 };
+  let flows: Ribbon[] = [];
   let ribbons: Ribbon[] = [];
+  let cords: Cord[] = [];
   let blocks: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = [];
   let raf = 0;
   let last = performance.now();
@@ -1006,11 +1486,13 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
 
   hero.dataset.motion = reduced ? "reduce" : "full";
   hero.dataset.renderer = "three-webgl";
+  panel.dataset.motion = hero.dataset.motion;
+  panel.dataset.renderer = hero.dataset.renderer;
 
   const createBlocks = () => {
     gridGroup.clear();
     blocks = [];
-    const geometry = new THREE.PlaneGeometry(grid.size - 7, grid.size - 7);
+    const geometry = new THREE.PlaneGeometry(grid.size - 4, grid.size - 4);
 
     for (let row = 0; row < grid.rows; row += 1) {
       for (let col = 0; col < grid.cols; col += 1) {
@@ -1038,18 +1520,19 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
     ribbons = Array.from({ length: count }, (_, index) => {
       const root = count === 1 ? 0.5 : index / (count - 1);
       const central = 1 - clamp(Math.abs(root - 0.5) / 0.32, 0, 1);
-      const heavy = central > 0.18 && (index % 2 === 0 || central > 0.68);
-      const sweep = !heavy && (index % 9 === 0 || index % 13 === 0);
+      const braid = central > 0.16 && (index % 3 === 1 || central > 0.74);
+      const lace = !braid && central > 0.34 && (index % 3 === 0 || central > 0.76);
+      const sweep = !lace && !braid && (index % 7 === 0 || index % 11 === 0);
       const parts = testing
-        ? (heavy || sweep ? 20 : 16)
-        : (heavy ? 72 + Math.floor(rand() * 18) : sweep ? 68 + Math.floor(rand() * 20) : 42 + Math.floor(rand() * 18));
-      const span = heavy ? 520 + rand() * 520 : sweep ? 620 + rand() * 640 : 360 + rand() * 460;
+        ? (braid ? 24 : lace || sweep ? 20 : 16)
+        : (braid ? 64 + Math.floor(rand() * 18) : lace ? 48 + Math.floor(rand() * 12) : sweep ? 74 + Math.floor(rand() * 22) : 46 + Math.floor(rand() * 20));
+      const span = braid ? 760 + rand() * 920 : lace ? 280 + rand() * 260 : sweep ? 720 + rand() * 720 : 420 + rand() * 520;
       const strand = new Strand({ x: 0, y: 0 }, parts, span, index + 97);
-      strand.width = heavy ? mix(2.6, 7.6, rand()) : sweep ? mix(2.0, 4.6, rand()) : mix(0.45, 2.2, rand());
-      strand.color = heavy ? mix(0.5, 1, rand()) : sweep ? mix(0.04, 0.34, rand()) : rand() * 0.8;
-      strand.curl = heavy ? mix(1.0, 2.8, rand()) : sweep ? mix(2.2, 4.3, rand()) : mix(0.35, 1.2, rand());
-      strand.depth = heavy ? mix(-4, 42, rand()) : sweep ? mix(12, 52, rand()) : mix(-28, 18, rand());
-      const ribbon = createRibbon(strand, strandMat);
+      strand.width = braid ? mix(4.4, 8.8, rand()) : lace ? mix(1.0, 3.2, rand()) : sweep ? mix(1.0, 2.8, rand()) : mix(0.36, 1.5, rand());
+      strand.color = braid ? mix(0.18, 0.62, rand()) : lace ? mix(0.44, 1, rand()) : sweep ? mix(0.02, 0.32, rand()) : rand() * 0.78;
+      strand.curl = braid ? mix(0.42, 0.95, rand()) : lace ? mix(1.3, 3.4, rand()) : sweep ? mix(2.5, 5.1, rand()) : mix(0.45, 1.55, rand());
+      strand.depth = braid ? mix(34, 68, rand()) : lace ? mix(16, 48, rand()) : sweep ? mix(4, 44, rand()) : mix(-34, 14, rand());
+      const ribbon = createRibbon(strand, braid ? braidMat : strandMat, braid ? "braid" : lace ? "lace" : "vine");
       tentacleGroup.add(ribbon.mesh);
       return ribbon;
     });
@@ -1060,6 +1543,92 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
     }, 0);
     beadGeometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(beadCount * 3), 3));
     beadGeometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(beadCount * 3), 3));
+  };
+
+  const createCords = (count: number) => {
+    cordGroup.clear();
+    const profiles = [
+      { root: 0.37, length: 2.52, width: 0.072, rot: -0.016, depth: 33, sway: 0.58 },
+      { root: 0.49, length: 2.62, width: 0.066, rot: 0.004, depth: 38, sway: 0.48 },
+      { root: 0.62, length: 2.48, width: 0.082, rot: 0.018, depth: 32, sway: 0.54 }
+    ];
+
+    if (!cordMat) {
+      cords = [];
+      return;
+    }
+
+    cords = Array.from({ length: Math.min(count, cordTextures.length, profiles.length) }, (_, index) => {
+      const profile = profiles[index]!;
+      const geometry = new THREE.PlaneGeometry(1, 1, 18, 96);
+      geometry.translate(0, 0.5, 0);
+      const material = cordMat.clone() as SceneMaterial;
+      material.uniforms = THREE.UniformsUtils.clone(cordMat.uniforms) as SceneMaterial["uniforms"];
+      material.uniforms.uMap.value = cordTextures[index]!;
+      material.uniforms.uSeed.value = rand() * tau;
+      material.uniforms.uTop.value = index === 0 ? 0.047 : index === 1 ? 0.033 : 0.035;
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.renderOrder = 4.15 - index * 0.04;
+      cordGroup.add(mesh);
+      return {
+        mesh,
+        root: profile.root,
+        length: profile.length,
+        width: profile.width,
+        phase: rand() * tau,
+        depth: profile.depth,
+        sway: profile.sway,
+        base: { x: 0, y: 0 },
+        size: { x: 1, y: 1 },
+        rot: profile.rot
+      };
+    });
+  };
+
+  const createFlows = (count: number) => {
+    flowGroup.clear();
+    flows = Array.from({ length: count }, (_, index) => {
+      const strand = new Strand(
+        { x: 0, y: 0 },
+        testing ? 18 : 44 + Math.floor(rand() * 18),
+        460 + rand() * 820,
+        index + 509
+      );
+      strand.width = mix(0.28, 1.45, rand());
+      strand.color = mix(0.02, 0.85, rand());
+      strand.curl = mix(1.5, 4.8, rand());
+      strand.depth = mix(-110, -54, rand());
+      strand.lean = mix(-1.5, 1.5, rand());
+      const ribbon = createRibbon(strand, flowMat, "flow");
+      ribbon.mesh.renderOrder = 1.7;
+      flowGroup.add(ribbon.mesh);
+      return ribbon;
+    });
+  };
+
+  const placeFlows = () => {
+    for (let i = 0; i < flows.length; i += 1) {
+      const strand = flows[i].strand;
+      const t = flows.length === 1 ? 0.5 : i / (flows.length - 1);
+      const side = i % 2 === 0 ? 1 : -1;
+      const root = {
+        x: grid.w * mix(0.06, 0.94, t),
+        y: -grid.h * mix(0.03, 0.24, Math.abs(Math.sin(i * 1.91)))
+      };
+      const span = grid.h * mix(0.72, 1.24, Math.abs(Math.sin(i * 2.37)));
+      strand.place(root, span);
+
+      for (let p = 0; p < strand.parts.length; p += 1) {
+        const along = p / Math.max(1, strand.parts.length - 1);
+        const drift = side * along ** 1.35 * grid.w * mix(0.08, 0.22, Math.abs(Math.sin(i + 0.4)));
+        const wave = Math.sin(strand.phase + along * (6.5 + strand.curl)) * along * 74;
+        const part = strand.parts[p];
+        part.x = root.x + drift + wave;
+        part.y = root.y + span * along + Math.sin(strand.phase * 0.7 + along * 7.4) * along * 32;
+        part.px = part.x;
+        part.py = part.y;
+      }
+    }
   };
 
   const placeTentacles = () => {
@@ -1090,8 +1659,27 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
     }
   };
 
+  const placeCords = () => {
+    const wide = grid.w >= 860;
+    for (let i = 0; i < cords.length; i += 1) {
+      const cord = cords[i];
+      const arc = Math.sin(cord.root * Math.PI);
+      const length = b.h * cord.length * (wide ? 1 : 0.86);
+      const width = b.w * cord.width * (wide ? 1 : 0.88);
+      const x = b.x + b.w * cord.root;
+      const y = b.y + b.h * (0.76 + Math.abs(cord.root - 0.5) * 0.22 + arc * 0.006);
+      cord.mesh.scale.set(width, length, 1);
+      cord.mesh.position.set(x, y, cord.depth);
+      cord.mesh.rotation.z = cord.rot;
+      cord.base.x = x;
+      cord.base.y = y;
+      cord.size.x = width;
+      cord.size.y = length;
+    }
+  };
+
   const resize = () => {
-    const rect = hero.getBoundingClientRect();
+    const rect = stage.getBoundingClientRect();
     const w = Math.max(1, Math.round(rect.width));
     const h = Math.max(1, Math.round(rect.height));
 
@@ -1108,23 +1696,48 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
     seaMesh.scale.set(w, h, 1);
     seaMesh.position.set(w * 0.5, h * 0.5, -90);
     sea.uniforms.uResolution.value = new THREE.Vector2(w, h);
+    mistMesh.scale.set(w, h, 1);
+    mistMesh.position.set(w * 0.5, h * 0.5, -70);
+    mist.uniforms.uResolution.value = new THREE.Vector2(w, h);
 
     float.scale.set(b.w, b.w, b.w);
     float.position.set(b.x + b.w * 0.5, b.y + b.h * 0.48, 24);
+    shadow.scale.set(b.w * 1.12, b.h * 1.22, 1);
+    shadow.position.set(b.x + b.w * 0.5, b.y + b.h * 1.12, 2);
+    const sheetHeight = b.w * (1180 / 900);
+    sheet.scale.set(b.w, sheetHeight, 1);
+    sheet.position.set(b.x + b.w * 0.5, b.y + sheetHeight * 0.5 - b.h * 0.12, 12);
     sail.scale.set(b.w, b.w, b.w);
     sail.position.copy(float.position);
     crest.scale.set(b.w, b.w, b.w);
     crest.position.copy(float.position);
 
     createBlocks();
+    createFlows(testing ? (w < 700 ? 4 : 7) : (w < 700 ? 7 : 13));
     createTentacles(testing ? (w < 700 ? 12 : 18) : (w < 700 ? 24 : 38));
+    createCords(w < 700 ? 2 : 3);
+    placeFlows();
     placeTentacles();
+    placeCords();
     dirty = false;
   };
 
-  const local = (event: PointerEvent): Vec => {
-    const rect = hero.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  const block = (clientX: number, clientY: number): Vec | null => {
+    const node = document.elementFromPoint(clientX, clientY);
+    const active = node instanceof Element
+      ? node.closest<HTMLElement>(".cm-cell, .cm-button, .cm-chip")
+      : null;
+
+    if (!active || !hero.contains(active)) {
+      return null;
+    }
+
+    const heroRect = stage.getBoundingClientRect();
+    const rect = active.getBoundingClientRect();
+    return cell({
+      x: rect.left + rect.width * 0.5 - heroRect.left,
+      y: rect.top + rect.height * 0.5 - heroRect.top
+    });
   };
 
   const cell = (point: Vec): Vec | null => {
@@ -1140,32 +1753,99 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
     };
   };
 
+  const local = (clientX: number, clientY: number): Vec => {
+    const rect = stage.getBoundingClientRect();
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  };
+
+  const animal = (point: Vec): Wake | null => {
+    const headX = (point.x - (b.x + b.w * 0.5)) / (b.w * 0.56);
+    const headY = (point.y - (b.y + b.h * 0.5)) / (b.h * 0.68);
+    const inHead = headX * headX + headY * headY < 1.08;
+    const canopy =
+      point.x >= b.x - b.w * 0.04 &&
+      point.x <= b.x + b.w * 1.04 &&
+      point.y >= b.y - b.h * 0.14 &&
+      point.y <= b.y + b.h * 0.82;
+    const cordHit = cords.some((item) => {
+      const low = clamp((point.y - item.base.y) / Math.max(1, item.size.y * 0.82), 0, 1);
+      const spread = item.size.x * (0.5 + low * 0.26);
+      return point.y >= item.base.y - b.h * 0.02 &&
+        point.y <= item.base.y + item.size.y * 0.82 &&
+        Math.abs(point.x - item.base.x) <= spread;
+    });
+    const braidHit =
+      !cordHit &&
+      point.x >= b.x + b.w * 0.32 &&
+      point.x <= b.x + b.w * 0.68 &&
+      point.y >= b.y + b.h * 0.78 &&
+      point.y <= b.y + b.h * 2.35;
+    const tail =
+      point.x >= b.x + b.w * 0.18 &&
+      point.x <= b.x + b.w * 0.82 &&
+      point.y >= b.y + b.h * 0.78 &&
+      point.y <= b.y + b.h * 3.45;
+
+    if (inHead || canopy) {
+      return { ...point, zone: "head" };
+    }
+
+    if (cordHit) {
+      return { ...point, zone: "cord" };
+    }
+
+    if (braidHit) {
+      return { ...point, zone: "braid" };
+    }
+
+    return tail ? { ...point, zone: "thread" } : null;
+  };
+
   const move = (event: PointerEvent) => {
     if (event.pointerType === "touch") {
       return;
     }
 
-    hover = cell(local(event));
+    const next = block(event.clientX, event.clientY);
+    hover = next;
+    wake = next ? null : animal(local(event.clientX, event.clientY));
   };
 
   const leave = () => {
     hover = null;
+    wake = null;
   };
 
   const down = (event: PointerEvent) => {
-    const point = cell(local(event));
+    const point = block(event.clientX, event.clientY);
 
-    if (!point) {
+    if (point) {
+      if (event.pointerType === "touch") {
+        tap = point;
+        tapUntil = performance.now() + 1800;
+        return;
+      }
+
+      hover = point;
+      return;
+    }
+
+    const mark = animal(local(event.clientX, event.clientY));
+
+    if (!mark) {
       return;
     }
 
     if (event.pointerType === "touch") {
-      tap = point;
-      tapUntil = performance.now() + 1800;
+      poke = mark;
+      pokeUntil = performance.now() + 1800;
       return;
     }
 
-    hover = point;
+    wake = mark;
   };
 
   const touch = (event: TouchEvent) => {
@@ -1175,19 +1855,65 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
       return;
     }
 
-    const rect = hero.getBoundingClientRect();
-    const point = cell({ x: first.clientX - rect.left, y: first.clientY - rect.top });
+    const point = block(first.clientX, first.clientY);
+
+    if (point) {
+      tap = point;
+      tapUntil = performance.now() + 1800;
+      return;
+    }
+
+    const mark = animal(local(first.clientX, first.clientY));
+
+    if (!mark) {
+      return;
+    }
+
+    poke = mark;
+    pokeUntil = performance.now() + 1800;
+  };
+
+  const center = (element: HTMLElement): Vec | null => {
+    const heroRect = stage.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
+    return cell({
+      x: rect.left + rect.width * 0.5 - heroRect.left,
+      y: rect.top + rect.height * 0.5 - heroRect.top
+    });
+  };
+
+  const nodes = Array.from(hero.querySelectorAll<HTMLElement>(".cm-cell, .cm-button, .cm-chip"));
+
+  const enter = (event: PointerEvent) => {
+    if (event.pointerType === "touch") {
+      return;
+    }
+
+    hover = center(event.currentTarget as HTMLElement);
+    wake = null;
+  };
+
+  const press = (event: PointerEvent) => {
+    const point = center(event.currentTarget as HTMLElement);
 
     if (!point) {
       return;
     }
 
-    tap = point;
-    tapUntil = performance.now() + 1800;
+    if (event.pointerType === "touch") {
+      tap = point;
+      tapUntil = performance.now() + 1800;
+      wake = null;
+      return;
+    }
+
+    hover = point;
+    wake = null;
   };
 
   const change = () => {
     hero.dataset.motion = options.reduced ?? (forced || media.matches) ? "reduce" : "full";
+    panel.dataset.motion = hero.dataset.motion;
   };
 
   const vis = () => {
@@ -1214,47 +1940,111 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
       tap = null;
     }
 
-    const activeCell = tap ?? hover;
-
-    if (activeCell) {
-      pulse(grid, activeCell, nowReduced ? 0.58 : 1);
+    if (poke && time > pokeUntil) {
+      poke = null;
     }
 
-    fade(grid, nowReduced ? 0.965 : 0.925);
-    hit = focus(grid);
-    const active = nowReduced ? 0 : hit?.strength ?? 0;
-    const target = hit ?? { x: b.x + b.w * 0.54, y: b.y + b.h * 1.58, strength: 0, total: 0 };
-    const uvTarget = new THREE.Vector2(clamp((target.x - b.x) / b.w, 0, 1), clamp((target.y - b.y) / Math.max(1, b.h * 2.15), 0, 1));
-    const screenTarget = new THREE.Vector2(clamp(target.x / grid.w, 0, 1), clamp(target.y / grid.h, 0, 1));
+    const activeCell = tap ?? hover;
+    const activeWake = poke ?? wake;
 
-    sea.uniforms.uTime.value = time * 0.001;
-    sea.uniforms.uActive.value = hit ? (nowReduced ? 0.3 : hit.strength) : 0;
+    if (activeCell) {
+      pulse(grid, activeCell, nowReduced ? 0.76 : testing ? 3.5 : 1.72);
+    }
+
+    fade(grid, nowReduced ? 0.965 : testing ? 0.985 : 0.925);
+    hit = focus(grid);
+    const rate = clamp(dt * 60, 0.25, 2);
+    const headWant = activeWake?.zone === "head" && !nowReduced ? 1 : 0;
+    const cordWant = activeWake?.zone === "cord" && !nowReduced ? 1 : 0;
+    const braidWant = activeWake?.zone === "braid" && !nowReduced ? 1 : 0;
+    const lineWant = activeWake?.zone === "thread" && !nowReduced ? 1 : 0;
+    head = clamp(head + (headWant - head) * (headWant > head ? 0.18 : 0.055) * rate, 0, 1);
+    cord = clamp(cord + (cordWant - cord) * (cordWant > cord ? 0.34 : 0.075) * rate, 0, 1);
+    braid = clamp(braid + (braidWant - braid) * (braidWant > braid ? 0.18 : 0.055) * rate, 0, 1);
+    line = clamp(line + (lineWant - line) * (lineWant > line ? 0.18 : 0.055) * rate, 0, 1);
+    const activeBase = hit?.strength ?? 0;
+    const blockActive = nowReduced
+      ? 0
+      : clamp(activeBase * (grid.w < 700 ? 1.45 : 1.18) + (activeCell ? 0.08 : 0), 0, 1);
+    const animalActive = Math.max(head, cord, braid, line);
+    const active = clamp(blockActive * 0.24 + animalActive, 0, 1);
+    const target = activeWake ?? hit ?? { x: b.x + b.w * 0.54, y: b.y + b.h * 1.58, strength: 0, total: 0 };
+    const uvTarget = new THREE.Vector2(clamp((target.x - b.x) / b.w, 0, 1), clamp((target.y - b.y) / Math.max(1, b.h * 2.15), 0, 1));
+    const blockTarget = hit ?? { x: b.x + b.w * 0.54, y: b.y + b.h * 1.58, strength: 0, total: 0 };
+    const screenTarget = new THREE.Vector2(clamp(blockTarget.x / grid.w, 0, 1), clamp(blockTarget.y / grid.h, 0, 1));
+    const bodyRoll = nowReduced ? 0 : Math.sin(time * 0.00042) * 0.006 + head * 0.014;
+    const bodyYaw = nowReduced ? 0 : Math.sin(time * 0.0003) * 0.032 + head * 0.04;
+    const bodyRoot = { x: b.x + b.w * 0.5, y: b.y + b.h * 0.48 };
+    const clock = nowReduced ? 0 : time * 0.001;
+    const pace = nowReduced ? 0 : 1;
+    const braidActive = clamp(blockActive + braid, 0, 1);
+
+    sea.uniforms.uTime.value = clock;
+    sea.uniforms.uActive.value = hit ? (nowReduced ? 0 : hit.strength) : animalActive * 0.12;
     sea.uniforms.uTarget.value = screenTarget;
-    bodyMat.uniforms.uTime.value = time * 0.001;
-    bodyMat.uniforms.uActive.value = active;
+    mist.uniforms.uTime.value = clock;
+    mist.uniforms.uActive.value = hit ? (nowReduced ? 0 : hit.strength * 0.44) : animalActive * 0.1;
+    shadowMat.uniforms.uTime.value = clock;
+    shadowMat.uniforms.uActive.value = active;
+    bodyMat.uniforms.uTime.value = clock;
+    bodyMat.uniforms.uActive.value = head;
     bodyMat.uniforms.uTarget.value = uvTarget;
-    sailMat.uniforms.uTime.value = time * 0.001;
-    sailMat.uniforms.uActive.value = active;
-    crestMat.uniforms.uTime.value = time * 0.001;
-    crestMat.uniforms.uActive.value = active;
-    strandMat.uniforms.uTime.value = time * 0.001;
-    strandMat.uniforms.uActive.value = active;
+    sailMat.uniforms.uTime.value = clock;
+    sailMat.uniforms.uActive.value = head;
+    crestMat.uniforms.uTime.value = clock;
+    crestMat.uniforms.uActive.value = head;
+    flowMat.uniforms.uTime.value = clock;
+    flowMat.uniforms.uActive.value = nowReduced ? 0.02 : 0.14 + blockActive * 0.08 + animalActive * 0.04;
+    strandMat.uniforms.uTime.value = clock;
+    strandMat.uniforms.uActive.value = 0;
+    braidMat.uniforms.uTime.value = clock;
+    braidMat.uniforms.uActive.value = braidActive;
+    sheetMat.uniforms.uTime.value = clock;
+    sheetMat.uniforms.uStill.value = nowReduced ? 1 : 0;
+    sheetMat.uniforms.uActive.value = clamp(cord * 0.22, 0, 1);
+
+    for (const item of cords) {
+      const material = item.mesh.material;
+      material.uniforms.uTime.value = clock;
+      material.uniforms.uStill.value = nowReduced ? 1 : 0;
+      material.uniforms.uActive.value = cord;
+      const root = spin(item.base, bodyRoot, bodyRoll);
+      const swim = cord * item.sway;
+      const pulse = 1 + swim * Math.sin(time * 0.0012 + item.phase) * 0.16;
+      item.mesh.rotation.z = item.rot + bodyRoll + Math.sin(time * 0.00086 + item.phase) * 0.12 * swim;
+      item.mesh.position.x = root.x;
+      item.mesh.position.y = root.y;
+      item.mesh.scale.set(item.size.x * (1 + swim * 0.08), item.size.y * pulse, 1);
+    }
 
     for (let i = 0; i < blocks.length; i += 1) {
       const value = grid.cells[i] ?? 0;
-      blocks[i].material.opacity = 0.018 + value * 0.68;
-      blocks[i].material.color.setHSL(0.52 + value * 0.22, 0.95, 0.54 + value * 0.16);
+      blocks[i].material.opacity = clamp(0.02 + value * (testing ? 10.5 : 2.55), 0.02, 1);
+      blocks[i].material.color.setHSL(0.52 + value * 0.22, 0.98, (testing ? 0.74 : 0.54) + value * (testing ? 0.33 : 0.16));
+      blocks[i].scale.setScalar(1 + value * (testing ? 0.08 : 0.025));
+    }
+
+    for (const ribbon of flows) {
+      ribbon.strand.step(dt * 0.65 * pace, null, nowReduced ? 0.02 : 0.08, nowReduced, time, grid);
+      updateRibbon(ribbon, nowReduced ? 0.03 : 0.12);
     }
 
     for (const ribbon of ribbons) {
-      ribbon.strand.step(dt, hit, active, nowReduced, time, grid);
-      updateRibbon(ribbon, active);
+      const familyActive =
+        ribbon.family === "braid"
+          ? braidActive
+          : 0;
+      const familyPace = ribbon.family === "braid" ? 0.62 : ribbon.family === "lace" ? 0.78 : 1;
+      const familyTarget = ribbon.family === "braid"
+        ? hit ?? (braid && activeWake?.zone === "braid" ? { ...activeWake, strength: braid, total: 1 } : null)
+        : null;
+      ribbon.strand.step(dt * familyPace * pace, familyTarget, familyActive, nowReduced, time, grid);
+      updateRibbon(ribbon, familyActive);
     }
-    updateBeads(beadGeometry, ribbons, active, time);
+    updateBeads(beadGeometry, ribbons, braidActive, nowReduced ? 0 : time);
 
-    const sway = nowReduced ? 0.002 : 0.006;
-    float.rotation.z = Math.sin(time * 0.00042) * sway + active * 0.012;
-    float.rotation.y = Math.sin(time * 0.0003) * (nowReduced ? 0.012 : 0.032) + active * 0.035;
+    float.rotation.z = bodyRoll;
+    float.rotation.y = bodyYaw;
     sail.rotation.copy(float.rotation);
     crest.rotation.copy(float.rotation);
 
@@ -1269,6 +2059,11 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
   hero.addEventListener("pointerdown", down);
   hero.addEventListener("touchstart", touch, { passive: true });
   hero.addEventListener("pointerleave", leave);
+  for (const node of nodes) {
+    node.addEventListener("pointerenter", enter);
+    node.addEventListener("pointermove", enter);
+    node.addEventListener("pointerdown", press);
+  }
   document.addEventListener("visibilitychange", vis);
   media.addEventListener("change", change);
   resize();
@@ -1282,12 +2077,27 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
       hero.removeEventListener("pointerdown", down);
       hero.removeEventListener("touchstart", touch);
       hero.removeEventListener("pointerleave", leave);
+      for (const node of nodes) {
+        node.removeEventListener("pointerenter", enter);
+        node.removeEventListener("pointermove", enter);
+        node.removeEventListener("pointerdown", press);
+      }
       document.removeEventListener("visibilitychange", vis);
       media.removeEventListener("change", change);
       sea.dispose();
       seaMesh.geometry.dispose();
+      mist.dispose();
+      mistMesh.geometry.dispose();
+      shadowMat.dispose();
+      shadow.geometry.dispose();
+      sheetMat.dispose();
+      sheet.geometry.dispose();
       bodyMat.dispose();
       texture.dispose();
+      tentaclesTexture.dispose();
+      for (const cordTexture of cordTextures) {
+        cordTexture.dispose();
+      }
       float.geometry.dispose();
       sailMat.dispose();
       sail.geometry.dispose();
@@ -1297,7 +2107,10 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
           node.geometry.dispose();
         }
       });
+      flowMat.dispose();
       strandMat.dispose();
+      braidMat.dispose();
+      cordMat?.dispose();
       beadGeometry.dispose();
       beadMaterial.map?.dispose();
       beadMaterial.dispose();
@@ -1307,6 +2120,13 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
       }
       for (const ribbon of ribbons) {
         ribbon.mesh.geometry.dispose();
+      }
+      for (const ribbon of flows) {
+        ribbon.mesh.geometry.dispose();
+      }
+      for (const cord of cords) {
+        cord.mesh.geometry.dispose();
+        cord.mesh.material.dispose();
       }
       renderer.dispose();
       root.innerHTML = "";

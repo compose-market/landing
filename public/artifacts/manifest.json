@@ -1,0 +1,16 @@
+{
+  "source": "../file_00000000c2707246964168d4011d7842.png",
+  "generated": "1970-01-01T00:00:00.000Z",
+  "crop": {
+    "left": 62,
+    "top": 172,
+    "width": 900,
+    "height": 1180
+  },
+  "artifacts": [
+    "tentacles.png",
+    "cord-01.png",
+    "cord-02.png",
+    "cord-03.png"
+  ]
+}
