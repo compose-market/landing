@@ -1,5 +1,5 @@
 {
-  "source": "../file_00000000c2707246964168d4011d7842.png",
+  "source": "assets/source.png",
   "generated": "1970-01-01T00:00:00.000Z",
   "crop": {
     "left": 62,
@@ -8,6 +8,8 @@
     "height": 1180
   },
   "artifacts": [
+    "head.png",
+    "manowar-full.png",
     "tentacles.png",
     "cord-01.png",
     "cord-02.png",
