@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "assets": "npm run artifacts",
-    "dev": "npm run assets && vite",
+    "dev": "vite",
     "build": "npm run assets && vite build",
     "check": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
@@ -18,12 +18,12 @@
     "@types/node": "^25.9.1",
     "@types/three": "^0.184.1",
     "sharp": "^0.34.5",
-    "tsx": "^4.22.3",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3",
-    "vite": "^8.0.13"
+    "vite": "^8.0.16"
   },
   "dependencies": {
-    "@compose-market/theme": "^0.0.90",
+    "@compose-market/theme": "^0.0.95",
     "three": "^0.184.0"
   }
 }

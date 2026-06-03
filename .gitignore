@@ -5,5 +5,4 @@ tmp/
 test-results/
 playwright-report/
 .vite/
-e2e
-scripts
+.env

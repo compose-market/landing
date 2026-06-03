@@ -1,6 +1,79 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Strand, fade, focus, net, pulse, type Hit } from "../src/scene.ts";
+import {
+  Strand,
+  fade,
+  focus,
+  formatMetricCount,
+  formatMetricUsdc,
+  metricDeltas,
+  metricValues,
+  metricsUrl,
+  net,
+  pulse,
+  type Hit
+} from "../src/home.ts";
+
+test("metrics helpers format live totals", () => {
+  assert.equal(metricsUrl("https://api.compose.market/"), "https://api.compose.market/api/metrics");
+  assert.equal(metricsUrl("api.compose.market"), "https://api.compose.market/api/metrics");
+  assert.equal(formatMetricCount(2258), "2,258");
+  assert.equal(formatMetricUsdc("5885.25"), "$5.885K");
+  const payload = {
+    totals: {
+      agents: 54,
+      payments: {
+        transactions: 120,
+        amountAtomic: "1234500000",
+        amountUsdc: "1234.5"
+      },
+      sessions: 19,
+      downloads: 2258
+    },
+    daily: {
+      agents: 2,
+      payments: {
+        transactions: 35,
+        amountAtomic: "456789",
+        amountUsdc: "0.456789"
+      },
+      sessions: 7,
+      downloads: 26
+    }
+  };
+  assert.deepEqual(metricValues(payload), {
+    agents: "54",
+    volume: "$1.235K",
+    sessions: "19",
+    downloads: "2,258"
+  });
+  assert.deepEqual(metricDeltas(payload), {
+    agents: "+2 today",
+    volume: "+$0.457 today",
+    sessions: "+7 today",
+    downloads: "+26 today"
+  });
+});
+
+test("metric deltas show zero until daily metrics are provided", () => {
+  assert.deepEqual(metricDeltas({
+    totals: {
+      agents: 1,
+      payments: {
+        transactions: 1,
+        amountAtomic: "1",
+        amountUsdc: "0.000001"
+      },
+      sessions: 1,
+      downloads: 1
+    }
+  }), {
+    agents: "+0 today",
+    volume: "+$0 today",
+    sessions: "+0 today",
+    downloads: "+0 today"
+  });
+});
 
 test("block activation selects the hovered cluster", () => {
   const grid = net(320, 240, 40);
