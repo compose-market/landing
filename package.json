@@ -4,18 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "assets": "npm run artifacts",
+    "assets": "npm run artifacts && npm run partners",
     "dev": "vite",
     "build": "npm run assets && vite build",
     "check": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
     "e2e": "npm run assets && playwright test",
     "slice": "tsx scripts/slice.ts",
-    "artifacts": "tsx scripts/artifacts.ts"
+    "artifacts": "tsx scripts/artifacts.ts",
+    "partners": "tsx scripts/partners.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
-    "@types/node": "^25.9.1",
+    "@types/node": "^25.9.2",
     "@types/three": "^0.184.1",
     "sharp": "^0.34.5",
     "tsx": "^4.22.4",
@@ -23,7 +24,7 @@
     "vite": "^8.0.16"
   },
   "dependencies": {
-    "@compose-market/theme": "^0.0.95",
+    "@compose-market/theme": "^0.1.14",
     "three": "^0.184.0"
   }
 }

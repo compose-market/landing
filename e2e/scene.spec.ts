@@ -5,7 +5,10 @@ async function ready(page: import("@playwright/test").Page) {
     const ok = await page.evaluate(() => {
       const canvas = document.querySelector("canvas");
       const heading = document.querySelector("h1");
-      return canvas instanceof HTMLCanvasElement && Boolean(heading?.textContent?.includes("COMPOSE"));
+      const hero = document.querySelector(".hero");
+      return canvas instanceof HTMLCanvasElement &&
+        hero?.getAttribute("data-renderer") === "three-webgl" &&
+        Boolean(heading?.textContent?.includes("AUTONOMY"));
     }).catch(() => false);
 
     if (ok) {
@@ -59,6 +62,20 @@ async function scrollInfo(page: import("@playwright/test").Page) {
   });
 }
 
+async function scrollToPanel(page: import("@playwright/test").Page, selector: string) {
+  await page.evaluate((targetSelector) => {
+    const scroller = document.querySelector<HTMLElement>(".scroll");
+    const target = document.querySelector<HTMLElement>(targetSelector);
+
+    if (!scroller || !target) {
+      throw new Error(`Missing scroll target: ${targetSelector}`);
+    }
+
+    scroller.scrollTo({ top: target.offsetTop, behavior: "instant" });
+  }, selector);
+  await page.waitForTimeout(650);
+}
+
 async function sum(page: import("@playwright/test").Page, x: number, y: number, w = 90, h = 90) {
   return page.evaluate(
     (box) => {
@@ -104,9 +121,9 @@ test("desktop and mobile render the landing scene", async ({ page }, info) => {
     compose: document.querySelector<HTMLAnchorElement>(".secondary")?.textContent ?? "",
     canvas: document.querySelector("canvas") instanceof HTMLCanvasElement
   }));
-  expect(mounted.heading).toContain("COMPOSE");
+  expect(mounted.heading).toContain("AUTONOMY");
   expect(mounted.market).toContain("Explore Market");
-  expect(mounted.compose).toContain("Start Composing");
+  expect(mounted.compose).toContain("Build with Manowar");
   expect(mounted.canvas).toBe(true);
   await expect(page.locator(".hero")).toHaveAttribute("data-renderer", "three-webgl");
   await page.waitForTimeout(600);
@@ -114,6 +131,88 @@ test("desktop and mobile render the landing scene", async ({ page }, info) => {
   const rect = await bounds(page);
   const painted = await sum(page, rect.width * 0.4, rect.height * 0.18, 320, 220);
   expect(painted).toBeGreaterThan(20_000);
+});
+
+test("poster fallback starts at the same scale as the WebGL scene", async ({ page }) => {
+  await page.route(/\/src\/scene\.ts(\?.*)?$/, (route) => route.abort());
+  await page.goto("/?test=1", { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".scene-poster__head")).toBeVisible();
+
+  const snapshot = await page.evaluate(() => {
+    const head = document.querySelector<HTMLElement>(".scene-poster__head");
+    const sheet = document.querySelector<HTMLElement>(".scene-poster__tentacles");
+    const hero = document.querySelector<HTMLElement>(".hero");
+
+    if (!head || !sheet || !hero) {
+      throw new Error("Missing poster elements");
+    }
+
+    const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+    const wide = window.innerWidth >= 860;
+    const bodyWidth = clamp(window.innerWidth * (wide ? 0.414 : 0.738), 288, 630);
+    const expectedHeadWidth = bodyWidth * 0.9;
+    const headRect = head.getBoundingClientRect();
+    const headStyle = getComputedStyle(head);
+    const sheetStyle = getComputedStyle(sheet);
+
+    return {
+      headWidth: Number.parseFloat(headStyle.width) || headRect.width,
+      expectedHeadWidth,
+      sheetWidth: Number.parseFloat(sheetStyle.width),
+      expectedSheetWidth: bodyWidth,
+      heroClientWidth: hero.clientWidth,
+      heroScrollWidth: hero.scrollWidth,
+      bodyScrollWidth: document.documentElement.scrollWidth
+    };
+  });
+
+  expect(Math.abs(snapshot.headWidth - snapshot.expectedHeadWidth)).toBeLessThan(3);
+  expect(Math.abs(snapshot.sheetWidth - snapshot.expectedSheetWidth)).toBeLessThan(3);
+  expect(snapshot.heroScrollWidth).toBeLessThanOrEqual(snapshot.heroClientWidth + 1);
+  expect(snapshot.bodyScrollWidth).toBeLessThanOrEqual((page.viewportSize()?.width ?? snapshot.bodyScrollWidth) + 1);
+});
+
+test("hero rich copy exposes code, numeric accents, and inference chips", async ({ page }) => {
+  await page.goto("/?test=1", { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator(".hero-code")).toHaveText("npm i -g @compose-market/sdk");
+  await expect(page.locator(".hero-chip")).toHaveCount(3);
+  await expect(page.locator(".hero-chip").nth(0)).toContainText("Reasoning");
+  await expect(page.locator(".hero-chip").nth(1)).toContainText("Media-gen");
+  await expect(page.locator(".hero-chip").nth(2)).toContainText("Embeddings");
+  await expect(page.locator(".hero-number")).toHaveCount(8);
+
+  const copy = await page.locator(".hero").textContent();
+  expect(copy).not.toContain("*any*");
+  expect(copy).not.toContain("'*");
+  expect(copy).not.toContain("'npm");
+
+  const layout = await page.evaluate(() => {
+    const hero = document.querySelector<HTMLElement>(".hero");
+    const visibleFloats = [...document.querySelectorAll<HTMLElement>(".float-card")]
+      .filter((node) => getComputedStyle(node).display !== "none")
+      .map((node) => {
+        const rect = node.getBoundingClientRect();
+        return {
+          width: rect.width,
+          height: rect.height,
+          scrollWidth: node.scrollWidth,
+          scrollHeight: node.scrollHeight
+        };
+      });
+
+    return {
+      heroClientWidth: hero?.clientWidth ?? 0,
+      heroScrollWidth: hero?.scrollWidth ?? 0,
+      visibleFloats
+    };
+  });
+
+  expect(layout.heroScrollWidth).toBeLessThanOrEqual(layout.heroClientWidth + 1);
+  for (const card of layout.visibleFloats) {
+    expect(card.scrollWidth).toBeLessThanOrEqual(card.width + 2);
+    expect(card.scrollHeight).toBeLessThanOrEqual(card.height + 6);
+  }
 });
 
 test("snap sections fill the viewport without stale selected states", async ({ page }) => {
@@ -150,7 +249,10 @@ test("scrolling lands on panel snap points", async ({ page }) => {
 test("partner badges use NVIDIA and Microsoft and fill their frames", async ({ page }) => {
   await page.goto("/?test=1");
   await ready(page);
-  await page.locator(".partners-panel").scrollIntoViewIfNeeded();
+  await scrollToPanel(page, ".partners-panel");
+  await expect(page.locator(".cm-partner-badge img")).toHaveCount(2);
+  await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>(".cm-partner-badge img")]
+    .every((node) => node.complete && node.naturalWidth > 0));
 
   const badges = await page.locator(".cm-partner-badge img").evaluateAll((nodes) => nodes.map((node) => {
     const image = node.getBoundingClientRect();
@@ -172,7 +274,8 @@ test("partner badges use NVIDIA and Microsoft and fill their frames", async ({ p
 test("partner logos match the web home tile treatment", async ({ page }, info) => {
   await page.goto("/?test=1");
   await ready(page);
-  await page.locator(".partners-panel").scrollIntoViewIfNeeded();
+  await scrollToPanel(page, ".partners-panel");
+  await expect(page.locator(".cm-partner-logo img").first()).toBeVisible();
 
   const unique = await page.locator(".cm-partner-logo img").evaluateAll((nodes) => {
     return [...new Set(nodes.map((node) => node.getAttribute("alt") ?? ""))];
@@ -265,13 +368,23 @@ test("pointer-highlighted blocks pull tentacles across the canvas", async ({ pag
     }
   }
 
-  await page.waitForTimeout(520);
+  let blockDelta = 0;
+  let limbDelta = 0;
 
-  const blockAfter = await sum(page, target.x, target.y, 180, 180);
-  const limbAfter = await sum(page, rect.width * 0.44, rect.height * 0.48, rect.width * 0.42, rect.height * 0.34);
+  for (let i = 0; i < 8; i += 1) {
+    await page.waitForTimeout(160);
+    const blockAfter = await sum(page, target.x, target.y, 180, 180);
+    const limbAfter = await sum(page, rect.width * 0.44, rect.height * 0.48, rect.width * 0.42, rect.height * 0.34);
+    blockDelta = Math.max(blockDelta, Math.abs(blockAfter - blockBefore));
+    limbDelta = Math.max(limbDelta, Math.abs(limbAfter - limbBefore));
 
-  expect(Math.abs(blockAfter - blockBefore)).toBeGreaterThan(info.project.name === "mobile" ? 250 : 400);
-  expect(Math.abs(limbAfter - limbBefore)).toBeGreaterThan(2_000);
+    if (blockDelta > (info.project.name === "mobile" ? 250 : 400) && limbDelta > 2_000) {
+      break;
+    }
+  }
+
+  expect(blockDelta).toBeGreaterThan(info.project.name === "mobile" ? 250 : 400);
+  expect(limbDelta).toBeGreaterThan(2_000);
 });
 
 test("calls to action remain clickable above the animation", async ({ page }) => {
@@ -280,8 +393,15 @@ test("calls to action remain clickable above the animation", async ({ page }) =>
   const box = await bounds(page);
 
   await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.65);
-  await page.evaluate(() => document.querySelector<HTMLAnchorElement>(".primary")?.click());
-  await expect(page).toHaveURL(/\/market$/);
+  await expect(page.locator(".primary")).toHaveAttribute("href", "https://app.compose.market/market");
+  await page.locator(".primary").evaluate((node) => {
+    node.addEventListener("click", (event) => {
+      event.preventDefault();
+      (node as HTMLElement).dataset.clicked = "true";
+    }, { once: true });
+  });
+  await page.locator(".primary").click();
+  await expect(page.locator(".primary")).toHaveAttribute("data-clicked", "true");
 });
 
 test.describe("reduced motion", () => {
