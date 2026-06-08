@@ -1,4 +1,9 @@
-import "@compose-market/theme/css";
+import "@compose-market/theme/css/tokens";
+import "@compose-market/theme/css/dark";
+import "@compose-market/theme/css/light";
+import "@compose-market/theme/css/app";
+import "@compose-market/theme/css/effects";
+import "@compose-market/theme/css/utilities";
 import "./style.css";
 import { mount } from "./home";
 
