@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@compose-market/theme": "^0.1.14",
+    "@vercel/analytics": "^2.0.1",
     "three": "^0.184.0"
   }
 }

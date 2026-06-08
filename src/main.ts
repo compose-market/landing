@@ -6,6 +6,10 @@ import "@compose-market/theme/css/effects";
 import "@compose-market/theme/css/utilities";
 import "./style.css";
 import { mount } from "./home";
+import { inject } from "@vercel/analytics";
+
+// Initialize Vercel Web Analytics
+inject();
 
 const root = document.querySelector<HTMLElement>("#app");
 
