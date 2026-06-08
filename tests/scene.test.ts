@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readdirSync, statSync } from "node:fs";
 import test from "node:test";
 import {
   Strand,
@@ -149,4 +150,22 @@ test("reduced motion disables target chasing", () => {
 
   assert.ok(normal.tip().x > reduced.tip().x + 24);
   assert.ok(normal.reach > reduced.reach + 0.2);
+});
+
+test("runtime image assets stay within the landing budget", () => {
+  const sceneFiles = [
+    "public/artifacts/head.webp",
+    "public/artifacts/tentacles.webp",
+    "public/artifacts/cord-01.webp",
+    "public/artifacts/cord-02.webp",
+    "public/artifacts/cord-03.webp"
+  ];
+  const sceneBytes = sceneFiles.reduce((total, file) => total + statSync(file).size, 0);
+  const partnerBytes = [
+    ...readdirSync("public/partners").filter((file) => file.endsWith(".webp")).map((file) => `public/partners/${file}`),
+    ...readdirSync("public/partners/badges").filter((file) => file.endsWith(".webp")).map((file) => `public/partners/badges/${file}`)
+  ].reduce((total, file) => total + statSync(file).size, 0);
+
+  assert.ok(sceneBytes < 500 * 1024, `scene textures are ${Math.round(sceneBytes / 1024)}KB`);
+  assert.ok(partnerBytes < 1_200 * 1024, `partner assets are ${Math.round(partnerBytes / 1024)}KB`);
 });
