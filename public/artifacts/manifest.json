@@ -8,11 +8,10 @@
     "height": 1180
   },
   "artifacts": [
-    "head.png",
-    "manowar-full.png",
-    "tentacles.png",
-    "cord-01.png",
-    "cord-02.png",
-    "cord-03.png"
+    "head.webp",
+    "tentacles.webp",
+    "cord-01.webp",
+    "cord-02.webp",
+    "cord-03.webp"
   ]
 }
