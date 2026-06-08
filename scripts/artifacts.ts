@@ -57,7 +57,7 @@ const canvas = {
 
 const cords: Spec[] = [
   {
-    file: "cord-01.png",
+    file: "cord-01.webp",
     width: 300,
     height: 1180,
     exposure: 1.03,
@@ -72,7 +72,7 @@ const cords: Spec[] = [
     ]
   },
   {
-    file: "cord-02.png",
+    file: "cord-02.webp",
     width: 290,
     height: 1180,
     exposure: 1.035,
@@ -87,7 +87,7 @@ const cords: Spec[] = [
     ]
   },
   {
-    file: "cord-03.png",
+    file: "cord-03.webp",
     width: 340,
     height: 1180,
     exposure: 1.02,
@@ -104,9 +104,8 @@ const cords: Spec[] = [
 ];
 
 const artifacts = [
-  "head.png",
-  "manowar-full.png",
-  "tentacles.png",
+  "head.webp",
+  "tentacles.webp",
   ...cords.map((item) => item.file),
   "manifest.json"
 ];
@@ -350,23 +349,17 @@ async function head(out: string) {
     }
   }
 
-  const png = await sharp(data, {
+  const webp = await sharp(data, {
     raw: {
       width: info.width,
       height: info.height,
       channels: info.channels
     }
   })
-    .png({ compressionLevel: 9 })
+    .webp({ quality: 88, alphaQuality: 95, smartSubsample: true, effort: 6 })
     .toBuffer();
 
-  const full = await sharp(source)
-    .extract(crop)
-    .png({ compressionLevel: 9 })
-    .toBuffer();
-
-  await writeOutput(out, "head.png", png);
-  await writeOutput(out, "manowar-full.png", full);
+  await writeOutput(out, "head.webp", webp);
 }
 
 async function collective(out: string) {
@@ -420,19 +413,19 @@ async function collective(out: string) {
     data[index + 3] = a;
   }
 
-  const png = await sharp(data, {
+  const webp = await sharp(data, {
     raw: {
       width: raw.info.width,
       height: raw.info.height,
       channels: raw.info.channels
     }
   })
-    .png({ compressionLevel: 9 })
+    .webp({ quality: 88, alphaQuality: 95, smartSubsample: true, effort: 6 })
     .toBuffer();
 
-  await writeOutput(out, "tentacles.png", png);
+  await writeOutput(out, "tentacles.webp", webp);
 
-  return await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  return await sharp(webp).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 }
 
 async function cord(raw: Raw, spec: Spec, out: string) {
@@ -494,16 +487,16 @@ async function cord(raw: Raw, spec: Spec, out: string) {
       withoutEnlargement: false,
       kernel: sharp.kernel.lanczos3
     })
-    .png()
+    .webp({ quality: 88, alphaQuality: 95, smartSubsample: true, effort: 6 })
     .toBuffer();
 
   const meta = await sharp(cut).metadata();
   const left = Math.floor((canvas.width - Math.min(meta.width ?? spec.width, canvas.width)) * 0.5);
   const body = meta.width && meta.width > canvas.width
-    ? await sharp(cut).resize({ width: canvas.width, height: spec.height, fit: "inside", kernel: sharp.kernel.lanczos3 }).png().toBuffer()
+    ? await sharp(cut).resize({ width: canvas.width, height: spec.height, fit: "inside", kernel: sharp.kernel.lanczos3 }).webp({ quality: 88, alphaQuality: 95, smartSubsample: true, effort: 6 }).toBuffer()
     : cut;
 
-  const png = await sharp({
+  const webp = await sharp({
     create: {
       width: canvas.width,
       height: canvas.height,
@@ -516,10 +509,10 @@ async function cord(raw: Raw, spec: Spec, out: string) {
       left: Math.max(0, left),
       top: 0
     }])
-    .png({ compressionLevel: 9 })
+    .webp({ quality: 88, alphaQuality: 95, smartSubsample: true, effort: 6 })
     .toBuffer();
 
-  await writeOutput(out, spec.file, png);
+  await writeOutput(out, spec.file, webp);
 }
 
 async function manifest(out: string) {
@@ -573,7 +566,13 @@ async function replace(next: string) {
       await rm(old, { force: true, recursive: true });
     }
 
-    await Promise.all(["cord-a.png", "cord-b.png", "cord-c.png"].map((file) => rm(path.join(app, "public", file), { force: true })));
+    await Promise.all([
+      "cord-a.png",
+      "cord-b.png",
+      "cord-c.png",
+      "head.png",
+      "manowar-full.png"
+    ].map((file) => rm(path.join(app, "public", file), { force: true })));
   } catch (error) {
     if (moved && !await exists(publicArtifacts) && await exists(old)) {
       await rename(old, publicArtifacts);

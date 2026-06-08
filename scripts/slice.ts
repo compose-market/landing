@@ -6,8 +6,8 @@ import sharp from "sharp";
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(dir, "../..");
 const source = path.join(root, "file_00000000c2707246964168d4011d7842.png");
-const out = path.join(dir, "../public/manowar.png");
-const full = path.join(dir, "../public/manowar-full.png");
+const out = path.join(dir, "../assets/slices/manowar.png");
+const full = path.join(dir, "../assets/slices/manowar-full.png");
 
 const crop = {
   left: 62,
