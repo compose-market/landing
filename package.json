@@ -24,14 +24,8 @@
     "vite": "^8.1.0"
   },
   "dependencies": {
-<<<<<<< HEAD
     "@compose-market/theme": "^0.1.40",
     "@vercel/analytics": "^2.0.1",
     "three": "^0.185.0"
-=======
-    "@compose-market/theme": "^0.1.14",
-    "@vercel/analytics": "^2.0.1",
-    "three": "^0.184.0"
->>>>>>> b94610679f9c3e16423d63213efd5ed72beed693
   }
 }
