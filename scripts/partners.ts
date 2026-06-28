@@ -31,6 +31,7 @@ const logos = [
   "couchbase.png",
   "datadog.png",
   "deepgram.png",
+  "deepinfra.png",
   "digitalocean.png",
   "fireworks-ai.png",
   "intercom.png",
