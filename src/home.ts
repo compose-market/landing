@@ -26,7 +26,6 @@ export type MountOptions = SceneOptions & {
 
 type PartnerLogo = { src: string; alt: string };
 type PartnerBadge = PartnerLogo & {
-  href: string;
   tone: "green" | "blue" | "cyan" | "purple";
 };
 
@@ -65,6 +64,7 @@ const partnerLogos: PartnerLogo[] = [
   { src: "/partners/datadog.webp", alt: "Datadog" },
   { src: "/partners/daytona.svg", alt: "Daytona" },
   { src: "/partners/deepgram.webp", alt: "Deepgram" },
+  { src: "/partners/deepinfra.webp", alt: "DeepInfra" },
   { src: "/partners/digitalocean.webp", alt: "DigitalOcean" },
   { src: "/partners/fireworks-ai.webp", alt: "Fireworks AI" },
   { src: "/partners/intercom.webp", alt: "Intercom" },
@@ -92,13 +92,11 @@ const partnerBadges: PartnerBadge[] = [
   {
     src: "/partners/badges/nvidia-badge.webp",
     alt: "NVIDIA Inception Program",
-    href: "https://www.nvidia.com/en-us/startups/",
     tone: "green"
   },
   {
     src: "/partners/badges/microsoft-badge.webp",
     alt: "Microsoft for Startups",
-    href: "https://www.microsoft.com/en-us/startups",
     tone: "blue"
   }
 ];
@@ -125,9 +123,9 @@ function logoTag(logo: PartnerLogo): string {
 
 function badgeTag(badge: PartnerBadge): string {
   return `
-    <a class="cm-partner-badge" data-tone="${badge.tone}" href="${badge.href}" target="_blank" rel="noopener noreferrer">
+    <div class="cm-partner-badge" data-tone="${badge.tone}">
       <img src="${badge.src}" alt="${badge.alt}" decoding="async" fetchpriority="low" draggable="false" />
-    </a>`;
+    </div>`;
 }
 
 function marquee(): string {
@@ -445,8 +443,8 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
         <div class="cm-app-shell__scanline"></div>
         <div class="stage" aria-hidden="true">
           <div class="scene-poster">
-            <img class="scene-poster__tentacles" src="/artifacts/tentacles.webp" width="900" height="1180" alt="" decoding="async" fetchpriority="high" draggable="false" />
-            <img class="scene-poster__head" src="/artifacts/head.webp" width="900" height="330" alt="" decoding="async" fetchpriority="high" draggable="false" />
+            <img class="scene-poster__tentacles" src="/artifacts/tentacles.webp" width="900" height="1180" alt="" decoding="async" fetchpriority="high" draggable="false" crossorigin="anonymous" />
+            <img class="scene-poster__head" src="/artifacts/head.webp" width="900" height="330" alt="" decoding="async" fetchpriority="high" draggable="false" crossorigin="anonymous" />
           </div>
         </div>
         <div class="veil" aria-hidden="true"></div>
@@ -494,7 +492,7 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
         <section class="panel deck-panel" aria-label="Protocol highlights">
           <div class="panel-copy band cm-glass neon-border">
             <p class="cm-kicker">Living Organism Framework</p>
-            <h2 class="cm-display">A UNIFIED,<br /><em>SYMBIOTIC</em> SYSTEM</h2>
+            <h2 class="cm-display">A UNIFIED, <em>SYMBIOTIC</em> SYSTEM</h2>
             <div class="organism" data-organism>
               <div class="organism-track">
                 <article class="organism-panel is-active" id="organism-chapter-manowar" role="tabpanel" aria-labelledby="organism-tab-manowar" aria-hidden="false" data-organism-panel>
@@ -510,11 +508,6 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
                 <button class="organism-dot is-active" id="organism-tab-manowar" type="button" role="tab" aria-selected="true" aria-controls="organism-chapter-manowar" aria-label="Read Portuguese Man O War chapter" data-organism-dot></button>
                 <button class="organism-dot" id="organism-tab-framework" type="button" role="tab" aria-selected="false" aria-controls="organism-chapter-framework" aria-label="Read agentic economy chapter" tabindex="-1" data-organism-dot></button>
               </div>
-            </div>
-            <div class="section-chip-list" aria-label="Protocol primitives">
-              <span class="section-chip" data-tone="cyan">Identity</span>
-              <span class="section-chip" data-tone="violet">Payments</span>
-              <span class="section-chip" data-tone="blue">Composition</span>
             </div>
           </div>
           <div class="features band">
