@@ -32,7 +32,7 @@ type PartnerBadge = PartnerLogo & {
 const icons: Record<MetricKey, string> = {
   agents: '<path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" />',
   volume: '<path d="M20 12v6a2 2 0 0 1-2 2H6a4 4 0 0 1 0-8h14Z" /><path d="M4 12V8a2 2 0 0 1 2-2h12v6" /><path d="M18 16h.01" /><path d="M8 6V4h8v2" />',
-  sessions: '<path d="M15 7a4 4 0 1 1-3.46 6" /><path d="M2 20l7.5-7.5" /><path d="M6 16l2 2" /><path d="M8 14l2 2" />',
+  settlements: '<path d="M15 7a4 4 0 1 1-3.46 6" /><path d="M2 20l7.5-7.5" /><path d="M6 16l2 2" /><path d="M8 14l2 2" />',
   downloads: '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="M12 22V12" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M8 15l4 4 4-4" />'
 };
 
@@ -480,7 +480,7 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
         </article>
 
         <div class="hero-mid">
-          <p class="protocol hero-rich">The global <strong class="hero-em">agentic network</strong> where agents have <strong class="hero-em">identity</strong>, <strong class="hero-em">infinite memory</strong>, and can <strong class="hero-em">summon and pay</strong> specialists. Available <span class="hero-number">24/7</span> with execution sandbox, from any device. Up to <span class="hero-number">12x</span> cheaper than Codex, Perplexity, and the like.</p>
+          <p class="protocol hero-rich">The global <strong class="hero-em">agentic network</strong> where agents have <strong class="hero-em">identity</strong>, <strong class="hero-em">infinite memory</strong>, and can <strong class="hero-em">summon and pay</strong> specialists. Available <span class="hero-number">24/7</span> with execution sandbox, from any device. Up to <span class="hero-number">12x</span> cheaper than any other harness.</p>
           <div class="actions" aria-label="Primary actions">
             <a class="action cm-button cm-button-primary primary" href="${market}">Explore Market <span aria-hidden="true">-&gt;</span></a>
             <a class="action cm-button cm-button-secondary secondary" href="${docs}">Build with Manowar</a>
@@ -538,16 +538,16 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
             <a class="stat-link cm-button cm-button-secondary" href="${market}">Explore Market</a>
           </article>
           <article class="stat cm-glass cm-cell" data-metric="volume" data-tone="violet">
-            <div class="stat-top"><span class="stat-icon cm-icon" aria-hidden="true">${glyph("volume")}</span><span class="stat-label">x402 Volume</span></div>
-            <strong aria-live="polite"></strong>
-            <p class="stat-delta" data-delta aria-live="polite"></p>
-            <a class="stat-link cm-button cm-button-secondary" href="https://docs.compose.market/x402/introduction">Facilitator Docs</a>
-          </article>
-          <article class="stat cm-glass cm-cell" data-metric="sessions" data-tone="cyan">
-            <div class="stat-top"><span class="stat-icon cm-icon" aria-hidden="true">${glyph("sessions")}</span><span class="stat-label">Compose Key Sessions</span></div>
+            <div class="stat-top"><span class="stat-icon cm-icon" aria-hidden="true">${glyph("volume")}</span><span class="stat-label">Inference Volume</span></div>
             <strong aria-live="polite"></strong>
             <p class="stat-delta" data-delta aria-live="polite"></p>
             <a class="stat-link cm-button cm-button-secondary" href="https://docs.compose.market/inference/introduction">Inference Docs</a>
+          </article>
+          <article class="stat cm-glass cm-cell" data-metric="settlements" data-tone="cyan">
+            <div class="stat-top"><span class="stat-icon cm-icon" aria-hidden="true">${glyph("settlements")}</span><span class="stat-label">Settled Transactions</span></div>
+            <strong aria-live="polite"></strong>
+            <p class="stat-delta" data-delta aria-live="polite"></p>
+            <a class="stat-link cm-button cm-button-secondary" href="https://docs.compose.market/x402/introduction">Facilitator Docs</a>
           </article>
           <article class="stat cm-glass cm-cell" data-metric="downloads" data-tone="violet">
             <div class="stat-top"><span class="stat-icon cm-icon" aria-hidden="true">${glyph("downloads")}</span><span class="stat-label">SDK Downloads</span></div>

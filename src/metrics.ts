@@ -21,9 +21,9 @@ export type MetricsPayload = {
   };
 };
 
-export type MetricKey = "agents" | "volume" | "sessions" | "downloads";
+export type MetricKey = "agents" | "volume" | "settlements" | "downloads";
 
-export const metricKeys = ["agents", "volume", "sessions", "downloads"] as const;
+export const metricKeys = ["agents", "volume", "settlements", "downloads"] as const;
 
 const pollMs = 15_000;
 
@@ -41,6 +41,18 @@ export function metricsUrl(base = env()): string | undefined {
   const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
 
   return `${url.replace(/\/+$/, "")}/api/metrics`;
+}
+
+function volumeUrl(base = env()): string | undefined {
+  const raw = base?.trim();
+
+  if (!raw) {
+    return undefined;
+  }
+
+  const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+
+  return `${url.replace(/\/+$/, "")}/api/metrics/volume`;
 }
 
 export function formatMetricCount(value: number): string {
@@ -79,7 +91,7 @@ export function metricValues(payload: MetricsPayload): Record<MetricKey, string>
   return {
     agents: formatMetricCount(payload.totals.agents),
     volume: formatMetricUsdc(payload.totals.payments.amountUsdc),
-    sessions: formatMetricCount(payload.totals.sessions),
+    settlements: formatMetricCount(payload.totals.payments.transactions),
     downloads: formatMetricCount(payload.totals.downloads)
   };
 }
@@ -89,7 +101,7 @@ export function metricDeltas(payload: MetricsPayload): Record<MetricKey, string>
   return {
     agents: `+${formatMetricCount(daily?.agents ?? 0)} today`,
     volume: `+${formatMetricUsdc(daily?.payments.amountUsdc ?? "0")} today`,
-    sessions: `+${formatMetricCount(daily?.sessions ?? 0)} today`,
+    settlements: `+${formatMetricCount(daily?.payments.transactions ?? 0)} today`,
     downloads: `+${formatMetricCount(daily?.downloads ?? 0)} today`
   };
 }
@@ -117,6 +129,7 @@ function writeMetrics(root: ParentNode, payload: MetricsPayload) {
 
 export function pollMetrics(root: ParentNode) {
   const url = metricsUrl();
+  const volUrl = volumeUrl();
 
   if (!url) {
     return () => { };
@@ -127,13 +140,24 @@ export function pollMetrics(root: ParentNode) {
 
   const load = async () => {
     try {
-      const response = await fetch(url, { cache: "no-store" });
+      const [metricsResponse, volumeResponse] = await Promise.all([
+        fetch(url, { cache: "no-store" }),
+        volUrl ? fetch(volUrl, { cache: "no-store" }) : Promise.resolve(null),
+      ]);
 
-      if (!response.ok) {
+      if (!metricsResponse.ok) {
         return;
       }
 
-      const payload = await response.json() as MetricsPayload;
+      const payload = await metricsResponse.json() as MetricsPayload;
+
+      if (volumeResponse && volumeResponse.ok) {
+        const vol = await volumeResponse.json() as { total: string; daily: string };
+        payload.totals.payments.amountUsdc = vol.total;
+        if (payload.daily) {
+          payload.daily.payments.amountUsdc = vol.daily;
+        }
+      }
 
       if (!stopped) {
         writeMetrics(root, payload);
