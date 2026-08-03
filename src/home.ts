@@ -18,7 +18,7 @@ export type Mount = {
 
 export type MountOptions = SceneOptions & {
   appBase?: string;
-  market?: string;
+  keys?: string;
   createAgent?: string;
   docsBase?: string;
   docs?: string;
@@ -431,7 +431,7 @@ function organism(root: ParentNode, forcedReduced = false) {
 export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
   const appBase = options.appBase ?? "https://app.compose.market";
   const docsBase = options.docsBase ?? "https://docs.compose.market";
-  const market = options.market ?? appUrl(appBase, "/market");
+  const keys = options.keys ?? appUrl(appBase, "/keys");
   const docs = appUrl(docsBase, "/");
   const createAgent = options.createAgent ?? appUrl(appBase, "/create-agent");
 
@@ -454,12 +454,12 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
       <section class="panel hero" aria-label="Compose.Market Manowar landing">
         <div class="hero-title">
           <p class="cm-kicker">Symbiotic Superintelligence</p>
-          <h1 class="cm-display" aria-label="The OS of Autonomy">THE OS OF<br /><em>AUTONOMY</em></h1>
+          <h1 class="cm-display" aria-label="The OS of Autonomy">THE FINANCIAL RAILS<br /><em>OF AGENTIC AUTONOMY</em></h1>
         </div>
 
         <article class="float-card card-a cm-glass cm-cell" aria-label="Inference">
           <p class="cm-kicker">Inference</p>
-          <p class="cm-copy hero-rich">Pay per use for <span class="hero-number">500+</span> models in <strong class="hero-em">crypto</strong>. <strong class="hero-em">No latency</strong>, <strong class="hero-em">no subs</strong>, <span class="hero-number">5.5x</span> cheaper than any aggregator <span class="hero-muted">(e.g. OpenRouter)</span>.</p>
+          <p class="cm-copy hero-rich">Pay per use for <span class="hero-number">700+</span> models in <strong class="hero-em">crypto</strong>. <strong class="hero-em">No latency</strong>, <strong class="hero-em">no subs</strong>, <span class="hero-number">5.5x</span> cheaper than any aggregator <span class="hero-muted">(e.g. OpenRouter)</span>.</p>
           <div class="hero-chip-list" aria-label="Inference model types">
             ${heroChip("reasoning", "Reasoning", "cyan")}
             ${heroChip("media", "Media-gen", "fuchsia")}
@@ -468,7 +468,7 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
         </article>
         <article class="float-card card-b cm-glass cm-cell" aria-label="SDK and APIs">
           <p class="cm-kicker">SDK/APIs</p>
-          <p class="cm-copy hero-rich"><code class="hero-code">npm i -g @compose-market/sdk</code> integrates <strong class="hero-em">anything</strong> out of the box: Manowar, inference frameworks, and catalogs with <span class="hero-number">500+</span> models, <span class="hero-number">100+</span> agents, and <span class="hero-number">3k+</span> tools.</p>
+          <p class="cm-copy hero-rich"><code class="hero-code">npm i -g @compose-market/sdk</code> integrates <strong class="hero-em">anything</strong> out of the box: Manowar, inference frameworks, and catalogs with <span class="hero-number">700+</span> models, <span class="hero-number">100+</span> agents, and <span class="hero-number">3k+</span> tools.</p>
         </article>
         <article class="float-card card-c cm-glass cm-cell" aria-label="Agent-native economy">
           <p class="cm-kicker">Agent-native Economy</p>
@@ -482,7 +482,7 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
         <div class="hero-mid">
           <p class="protocol hero-rich">The global <strong class="hero-em">agentic network</strong> where agents have <strong class="hero-em">identity</strong>, <strong class="hero-em">infinite memory</strong>, and can <strong class="hero-em">summon and pay</strong> specialists. Available <span class="hero-number">24/7</span> with execution sandbox, from any device. Up to <span class="hero-number">12x</span> cheaper than any other harness.</p>
           <div class="actions" aria-label="Primary actions">
-            <a class="action cm-button cm-button-primary primary" href="${market}">Explore Market <span aria-hidden="true">-&gt;</span></a>
+            <a class="action cm-button cm-button-primary primary" href="${keys}">See your Keys <span aria-hidden="true">-&gt;</span></a>
             <a class="action cm-button cm-button-secondary secondary" href="${docs}">Build with Manowar</a>
           </div>
         </div>
@@ -535,7 +535,7 @@ export function mount(root: HTMLElement, options: MountOptions = {}): Mount {
             <div class="stat-top"><span class="stat-icon cm-icon" aria-hidden="true">${glyph("agents")}</span><span class="stat-label">Global Agents</span></div>
             <strong aria-live="polite"></strong>
             <p class="stat-delta" data-delta aria-live="polite"></p>
-            <a class="stat-link cm-button cm-button-secondary" href="${market}">Explore Market</a>
+            <a class="stat-link cm-button cm-button-secondary" href="${keys}">Create your Key</a>
           </article>
           <article class="stat cm-glass cm-cell" data-metric="volume" data-tone="violet">
             <div class="stat-top"><span class="stat-icon cm-icon" aria-hidden="true">${glyph("volume")}</span><span class="stat-label">Inference Volume</span></div>
