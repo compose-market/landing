@@ -230,7 +230,7 @@ canvas {
 }
 
 .hero-title h1 {
-  font-size: clamp(2.45rem, 7.4vw, 5.8rem);
+  font-size: clamp(1.45rem, 4.4vw, 3.8rem);
   -webkit-text-stroke: clamp(0.035rem, 0.075vw, 0.06rem) rgba(2, 6, 7, 0.62);
   text-shadow:
     0 2px 0 rgba(2, 6, 7, 0.92),
@@ -638,8 +638,13 @@ canvas {
 /* ── Partners & Marquee (landing-specific, moved from theme) ── */
 
 @keyframes cm-partner-scanline {
-  0% { transform: translate3d(0, -100px, 0); }
-  100% { transform: translate3d(0, calc(100vh + 100px), 0); }
+  0% {
+    transform: translate3d(0, -100px, 0);
+  }
+
+  100% {
+    transform: translate3d(0, calc(100vh + 100px), 0);
+  }
 }
 
 .cm-partners {
@@ -763,20 +768,16 @@ canvas {
   width: 100%;
   min-width: 0;
   overflow: hidden;
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    black 6%,
-    black 94%,
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    black 6%,
-    black 94%,
-    transparent 100%
-  );
+  mask-image: linear-gradient(90deg,
+      transparent 0%,
+      black 6%,
+      black 94%,
+      transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg,
+      transparent 0%,
+      black 6%,
+      black 94%,
+      transparent 100%);
 }
 
 /* Kill the old theme pseudo-element overlays (white dissolvence) still in node_modules */
