@@ -15,17 +15,17 @@
     "partners": "tsx scripts/partners.ts"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
-    "@types/node": "^26.0.1",
-    "@types/three": "^0.185.0",
-    "sharp": "^0.35.2",
-    "tsx": "^4.22.4",
-    "typescript": "^6.0.3",
-    "vite": "^8.1.0"
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.1.2",
+    "@types/three": "^0.185.3",
+    "sharp": "^0.35.3",
+    "tsx": "^4.23.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.0"
   },
   "dependencies": {
-    "@compose-market/theme": "^0.1.40",
+    "@compose-market/theme": "^0.1.56",
     "@vercel/analytics": "^2.0.1",
-    "three": "^0.185.0"
+    "three": "^0.185.1"
   }
 }
