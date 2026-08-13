@@ -16,6 +16,8 @@ import {
 
 export type SceneMount = {
   destroy: () => void;
+  /** Re-attach interactive bindings after page content is swapped (client-side pagination). */
+  rebind: () => void;
 };
 
 export type SceneOptions = {
@@ -1537,7 +1539,7 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     });
   };
 
-  const nodes = Array.from(hero.querySelectorAll<HTMLElement>(".cm-cell, .cm-button, .cm-chip"));
+  let nodes: HTMLElement[] = [];
 
   const enter = (event: PointerEvent) => {
     if (event.pointerType === "touch") {
@@ -1568,7 +1570,10 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
 
   const change = () => {
     hero.dataset.motion = options.reduced ?? (forced || media.matches) ? "reduce" : "full";
-    panel.dataset.motion = hero.dataset.motion;
+    const currentPanel = root.querySelector<HTMLElement>(".hero");
+    if (currentPanel) {
+      currentPanel.dataset.motion = hero.dataset.motion;
+    }
   };
 
   const vis = () => {
@@ -1740,16 +1745,11 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
   hero.addEventListener("pointerdown", down);
   hero.addEventListener("touchstart", touch, { passive: true });
   hero.addEventListener("pointerleave", leave);
-  for (const node of nodes) {
-    node.addEventListener("pointerenter", enter);
-    node.addEventListener("pointermove", enter);
-    node.addEventListener("pointerdown", press);
-  }
   document.addEventListener("visibilitychange", vis);
   media.addEventListener("change", change);
 
   // Marquee pause on hover
-  const marqueeEl = root.querySelector<HTMLElement>(".cm-partner-marquee");
+  let marqueeEl: HTMLElement | null = null;
   const marqueeToggle = (paused: boolean) => {
     if (!marqueeEl) return;
     const tracks = marqueeEl.querySelectorAll<HTMLElement>(".cm-partner-marquee__inner");
@@ -1759,13 +1759,49 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
   };
   const enterMarquee = () => marqueeToggle(true);
   const leaveMarquee = () => marqueeToggle(false);
-  marqueeEl?.addEventListener("pointerenter", enterMarquee);
-  marqueeEl?.addEventListener("pointerleave", leaveMarquee);
+
+  // Page content can be swapped client-side (see main.ts pagination): these
+  // bindings target elements inside .scroll, so they must be re-attachable.
+  const unbindContent = () => {
+    for (const node of nodes) {
+      node.removeEventListener("pointerenter", enter);
+      node.removeEventListener("pointermove", enter);
+      node.removeEventListener("pointerdown", press);
+    }
+    nodes = [];
+    marqueeEl?.removeEventListener("pointerenter", enterMarquee);
+    marqueeEl?.removeEventListener("pointerleave", leaveMarquee);
+    marqueeEl = null;
+  };
+
+  const bindContent = () => {
+    unbindContent();
+
+    const currentPanel = root.querySelector<HTMLElement>(".hero");
+    if (currentPanel) {
+      currentPanel.dataset.motion = hero.dataset.motion;
+      currentPanel.dataset.renderer = hero.dataset.renderer;
+    }
+
+    nodes = Array.from(hero.querySelectorAll<HTMLElement>(".cm-cell, .cm-button, .cm-chip"));
+    for (const node of nodes) {
+      node.addEventListener("pointerenter", enter);
+      node.addEventListener("pointermove", enter);
+      node.addEventListener("pointerdown", press);
+    }
+
+    marqueeEl = root.querySelector<HTMLElement>(".cm-partner-marquee");
+    marqueeEl?.addEventListener("pointerenter", enterMarquee);
+    marqueeEl?.addEventListener("pointerleave", leaveMarquee);
+  };
+
+  bindContent();
 
   resize();
   frame(performance.now());
 
   return {
+    rebind: bindContent,
     destroy() {
       window.cancelAnimationFrame(raf);
       window.clearTimeout(posterTimer);
@@ -1774,15 +1810,9 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
       hero.removeEventListener("pointerdown", down);
       hero.removeEventListener("touchstart", touch);
       hero.removeEventListener("pointerleave", leave);
-      for (const node of nodes) {
-        node.removeEventListener("pointerenter", enter);
-        node.removeEventListener("pointermove", enter);
-        node.removeEventListener("pointerdown", press);
-      }
+      unbindContent();
       document.removeEventListener("visibilitychange", vis);
       media.removeEventListener("change", change);
-      marqueeEl?.removeEventListener("pointerenter", enterMarquee);
-      marqueeEl?.removeEventListener("pointerleave", leaveMarquee);
       sea.dispose();
       seaMesh.geometry.dispose();
       mist.dispose();
