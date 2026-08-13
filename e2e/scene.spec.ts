@@ -8,7 +8,7 @@ async function ready(page: import("@playwright/test").Page) {
       const hero = document.querySelector(".hero");
       return canvas instanceof HTMLCanvasElement &&
         hero?.getAttribute("data-renderer") === "three-webgl" &&
-        Boolean(heading?.textContent?.includes("AUTONOMY"));
+        Boolean(heading?.textContent?.includes("FINANCIAL RAILS"));
     }).catch(() => false);
 
     if (ok) {
@@ -18,20 +18,7 @@ async function ready(page: import("@playwright/test").Page) {
     await page.waitForTimeout(100);
   }
 
-  throw new Error("Scene did not mount");
-}
-
-async function bounds(page: import("@playwright/test").Page) {
-  return page.evaluate(() => {
-    const canvas = document.querySelector("canvas");
-
-    if (!(canvas instanceof HTMLCanvasElement)) {
-      throw new Error("Missing canvas");
-    }
-
-    const rect = canvas.getBoundingClientRect();
-    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-  });
+  throw new Error("Landing page did not mount");
 }
 
 async function scrollInfo(page: import("@playwright/test").Page) {
@@ -76,43 +63,7 @@ async function scrollToPanel(page: import("@playwright/test").Page, selector: st
   await page.waitForTimeout(650);
 }
 
-async function sum(page: import("@playwright/test").Page, x: number, y: number, w = 90, h = 90) {
-  return page.evaluate(
-    (box) => {
-      const node = document.querySelector("canvas");
-
-      if (!(node instanceof HTMLCanvasElement)) {
-        return 0;
-      }
-
-      const gl = node.getContext("webgl2", { preserveDrawingBuffer: true }) ?? node.getContext("webgl", { preserveDrawingBuffer: true });
-
-      if (!gl) {
-        return 0;
-      }
-
-      const rect = node.getBoundingClientRect();
-      const sx = gl.drawingBufferWidth / rect.width;
-      const sy = gl.drawingBufferHeight / rect.height;
-      const x = Math.max(0, Math.min(gl.drawingBufferWidth - 1, Math.floor(box.x * sx)));
-      const h = Math.max(1, Math.min(gl.drawingBufferHeight, Math.floor(box.h * sy)));
-      const y = Math.max(0, Math.min(gl.drawingBufferHeight - h, Math.floor(gl.drawingBufferHeight - (box.y + box.h) * sy)));
-      const w = Math.max(1, Math.min(gl.drawingBufferWidth - x, Math.floor(box.w * sx)));
-      const data = new Uint8Array(w * h * 4);
-      gl.readPixels(x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, data);
-      let total = 0;
-
-      for (let i = 0; i < data.length; i += 64) {
-        total += data[i] + data[i + 1] + data[i + 2] + data[i + 3];
-      }
-
-      return total;
-    },
-    { x, y, w, h }
-  );
-}
-
-test("desktop and mobile render the landing scene", async ({ page }, info) => {
+test("desktop and mobile render the inference landing", async ({ page }) => {
   await page.goto("/?test=1");
   await ready(page);
   const mounted = await page.evaluate(() => ({
@@ -121,66 +72,117 @@ test("desktop and mobile render the landing scene", async ({ page }, info) => {
     compose: document.querySelector<HTMLAnchorElement>(".secondary")?.textContent ?? "",
     canvas: document.querySelector("canvas") instanceof HTMLCanvasElement
   }));
-  expect(mounted.heading).toContain("AUTONOMY");
-  expect(mounted.market).toContain("Explore Market");
-  expect(mounted.compose).toContain("Build with Manowar");
+  expect(mounted.heading).toContain("FINANCIAL RAILS");
+  expect(mounted.market).toContain("See your Keys");
+  expect(mounted.compose).toContain("Inference Docs");
   expect(mounted.canvas).toBe(true);
   await expect(page.locator(".hero")).toHaveAttribute("data-renderer", "three-webgl");
-  await page.waitForTimeout(600);
-
-  const rect = await bounds(page);
-  const painted = await sum(page, rect.width * 0.4, rect.height * 0.18, 320, 220);
-  expect(painted).toBeGreaterThan(20_000);
 });
 
-test("poster fallback starts at the same scale as the WebGL scene", async ({ page }) => {
-  await page.route(/\/src\/scene\.ts(\?.*)?$/, (route) => route.abort());
+test("native glass cubies light and move out of the assembly", async ({ page }, info) => {
+  await page.goto("/?test=1");
+  await ready(page);
+
+  const canvas = page.locator('canvas[data-scene-canvas="inference"]');
+  await expect(canvas).toHaveAttribute("data-geometry", "native-3d");
+  await expect(canvas).toHaveAttribute("data-cubie-count", "27");
+  await expect(canvas).toHaveAttribute("data-particle-count", "72");
+  await expect(canvas).toHaveAttribute("data-circuit-mode", "pointer-driven");
+  await expect(page.locator('[data-ambient-rail-layer="inference"]')).toHaveCount(1);
+  await expect.poll(async () => Number(await canvas.getAttribute("data-ambient-circuits"))).toBeGreaterThan(0);
+  const idleSpread = Number(await canvas.getAttribute("data-particle-spread"));
+  expect(idleSpread).toBeGreaterThan(0.8);
+
+  const viewport = page.viewportSize();
+  const x = (viewport?.width ?? 1) * 0.5;
+  const y = (viewport?.height ?? 1) * 0.5;
+
+  if (info.project.name === "mobile") {
+    await page.touchscreen.tap(x, y);
+  } else {
+    await page.evaluate(() => {
+      const sceneCanvas = document.querySelector<HTMLCanvasElement>('canvas[data-scene-canvas="inference"]');
+      const samples: number[] = [];
+      const timer = window.setInterval(() => {
+        samples.push(Number(sceneCanvas?.dataset.particleSpread));
+      }, 20);
+
+      window.setTimeout(() => {
+        window.clearInterval(timer);
+        if (sceneCanvas) {
+          sceneCanvas.dataset.testMinimumSpread = String(Math.min(...samples));
+        }
+      }, 900);
+    });
+    await page.mouse.move(x, y);
+  }
+
+  await expect(canvas).not.toHaveAttribute("data-active-cubie", "none");
+  let gatheredSpread = idleSpread;
+
+  if (info.project.name !== "mobile") {
+    await expect(canvas).toHaveAttribute("data-test-minimum-spread", /\d/, { timeout: 2_000 });
+    gatheredSpread = Number(await canvas.getAttribute("data-test-minimum-spread"));
+  }
+
+  await expect(canvas).toHaveAttribute("data-rail-direction", "ingress");
+  await expect.poll(async () => Number(await canvas.getAttribute("data-active-offset"))).toBeGreaterThan(0.08);
+  await expect.poll(async () => Number(await canvas.getAttribute("data-active-circuits"))).toBeGreaterThan(0);
+  await expect(page.locator('[data-rail-layer="inference"] [data-direction="ingress"]')).not.toHaveCount(0);
+
+  if (info.project.name === "mobile") {
+    await expect(canvas).toHaveAttribute("data-active-cubie", "none", { timeout: 4_000 });
+    await expect.poll(async () => Number(await canvas.getAttribute("data-particle-spread")), { timeout: 5_000 })
+      .toBeGreaterThan(idleSpread * 0.72);
+  } else {
+    expect(gatheredSpread).toBeLessThan(idleSpread * 0.9);
+    await expect.poll(async () => Number(await canvas.getAttribute("data-particle-spread")), { timeout: 5_000 })
+      .toBeGreaterThan(Math.max(gatheredSpread * 1.08, idleSpread * 0.88));
+    await expect(canvas).not.toHaveAttribute("data-active-cubie", "none");
+    await page.mouse.move(8, 8);
+    await expect(canvas).toHaveAttribute("data-active-cubie", "none");
+    await expect.poll(async () => Number(await canvas.getAttribute("data-active-offset"))).toBeLessThan(0.02);
+    await page.locator(".primary").hover();
+    await expect(canvas).toHaveAttribute("data-rail-direction", "egress");
+    await expect.poll(async () => Number(await canvas.getAttribute("data-active-circuits"))).toBeGreaterThan(0);
+    await expect(page.locator('[data-rail-layer="inference"] [data-direction="egress"]')).not.toHaveCount(0);
+  }
+});
+
+test("reduced motion keeps particles dispersed and disables ambient propagation", async ({ page }) => {
+  await page.goto("/?test=1&motion=reduce");
+  await ready(page);
+
+  const canvas = page.locator('canvas[data-scene-canvas="inference"]');
+  await expect(page.locator(".shell")).toHaveAttribute("data-motion", "reduce");
+  await expect(canvas).toHaveAttribute("data-ambient-circuits", "0");
+  await expect(page.locator('[data-ambient-rail="true"]')).toHaveCount(0);
+  await expect.poll(async () => Number(await canvas.getAttribute("data-particle-spread"))).toBeGreaterThan(0.8);
+  await page.waitForTimeout(1_100);
+  await expect(canvas).toHaveAttribute("data-ambient-circuits", "0");
+});
+
+test("workflow band shows the dashboard showcase instead of code cards", async ({ page }) => {
   await page.goto("/?test=1", { waitUntil: "domcontentloaded" });
-  await expect(page.locator(".scene-poster__head")).toBeVisible();
 
-  const snapshot = await page.evaluate(() => {
-    const head = document.querySelector<HTMLElement>(".scene-poster__head");
-    const sheet = document.querySelector<HTMLElement>(".scene-poster__tentacles");
-    const hero = document.querySelector<HTMLElement>(".hero");
-
-    if (!head || !sheet || !hero) {
-      throw new Error("Missing poster elements");
-    }
-
-    const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-    const wide = window.innerWidth >= 860;
-    const bodyWidth = clamp(window.innerWidth * (wide ? 0.414 : 0.738), 288, 630);
-    const expectedHeadWidth = bodyWidth * 0.9;
-    const headRect = head.getBoundingClientRect();
-    const headStyle = getComputedStyle(head);
-    const sheetStyle = getComputedStyle(sheet);
-
-    return {
-      headWidth: Number.parseFloat(headStyle.width) || headRect.width,
-      expectedHeadWidth,
-      sheetWidth: Number.parseFloat(sheetStyle.width),
-      expectedSheetWidth: bodyWidth,
-      heroClientWidth: hero.clientWidth,
-      heroScrollWidth: hero.scrollWidth,
-      bodyScrollWidth: document.documentElement.scrollWidth
-    };
-  });
-
-  expect(Math.abs(snapshot.headWidth - snapshot.expectedHeadWidth)).toBeLessThan(3);
-  expect(Math.abs(snapshot.sheetWidth - snapshot.expectedSheetWidth)).toBeLessThan(3);
-  expect(snapshot.heroScrollWidth).toBeLessThanOrEqual(snapshot.heroClientWidth + 1);
-  expect(snapshot.bodyScrollWidth).toBeLessThanOrEqual((page.viewportSize()?.width ?? snapshot.bodyScrollWidth) + 1);
+  await expect(page.locator(".workflow .dash-demo")).toHaveCount(1);
+  await expect(page.locator(".workflow .dd-header")).toContainText("Dashboard");
+  await expect(page.locator(".workflow .dd-stat")).toHaveCount(5);
+  await expect(page.locator(".workflow .dd-block")).toHaveCount(3);
+  await expect(page.locator(".workflow .dd-table tbody tr")).toHaveCount(5);
+  await expect(page.locator(".workflow .dd-feed__item").first()).toContainText("Qwen3.8-Max");
+  await expect(page.locator(".workflow .code-card")).toHaveCount(0);
 });
 
 test("hero rich copy exposes code, numeric accents, and inference chips", async ({ page }) => {
   await page.goto("/?test=1", { waitUntil: "domcontentloaded" });
 
-  await expect(page.locator(".hero-code")).toHaveText("npm i -g @compose-market/sdk");
+  await expect(page.locator(".card-c .hero-code")).toHaveText("npm i @compose-market/sdk");
   await expect(page.locator(".hero-chip")).toHaveCount(3);
-  await expect(page.locator(".hero-chip").nth(0)).toContainText("Reasoning");
-  await expect(page.locator(".hero-chip").nth(1)).toContainText("Media-gen");
+  await expect(page.locator(".hero-chip").nth(0)).toContainText("LLM");
+  await expect(page.locator(".hero-chip").nth(1)).toContainText("Media");
   await expect(page.locator(".hero-chip").nth(2)).toContainText("Embeddings");
-  await expect(page.locator(".hero-number")).toHaveCount(8);
+  await expect(page.locator(".hero-number")).toHaveCount(3);
 
   const copy = await page.locator(".hero").textContent();
   expect(copy).not.toContain("*any*");
@@ -330,70 +332,11 @@ test("partner logos match the web home tile treatment", async ({ page }, info) =
   }
 });
 
-test("pointer-highlighted blocks pull tentacles across the canvas", async ({ page }, info) => {
+test("calls to action remain clickable", async ({ page }) => {
   await page.goto("/?test=1");
   await ready(page);
-  await page.waitForTimeout(220);
 
-  const rect = await bounds(page);
-  const selector = info.project.name === "mobile" ? ".secondary" : ".card-b";
-  await page.locator(selector).scrollIntoViewIfNeeded();
-  const targetBox = await page.locator(selector).boundingBox();
-
-  if (!targetBox) {
-    throw new Error(`Missing interaction target: ${selector}`);
-  }
-
-  const target = {
-    x: targetBox.x - rect.x + targetBox.width * 0.5,
-    y: targetBox.y - rect.y + targetBox.height * 0.5
-  };
-  const blockBefore = await sum(page, target.x, target.y, 180, 180);
-  const limbBefore = await sum(page, rect.width * 0.44, rect.height * 0.48, rect.width * 0.42, rect.height * 0.34);
-
-  const point = {
-    x: targetBox.x + targetBox.width * 0.5,
-    y: targetBox.y + targetBox.height * 0.5
-  };
-
-  if (info.project.name === "mobile") {
-    await page.locator(selector).evaluate((node) => {
-      node.addEventListener("click", (event) => event.preventDefault(), { once: true });
-    });
-    await page.touchscreen.tap(point.x, point.y);
-  } else {
-    for (let i = 0; i < 4; i += 1) {
-      await page.mouse.move(point.x + i * 2, point.y + i * 2);
-      await page.waitForTimeout(120);
-    }
-  }
-
-  let blockDelta = 0;
-  let limbDelta = 0;
-
-  for (let i = 0; i < 8; i += 1) {
-    await page.waitForTimeout(160);
-    const blockAfter = await sum(page, target.x, target.y, 180, 180);
-    const limbAfter = await sum(page, rect.width * 0.44, rect.height * 0.48, rect.width * 0.42, rect.height * 0.34);
-    blockDelta = Math.max(blockDelta, Math.abs(blockAfter - blockBefore));
-    limbDelta = Math.max(limbDelta, Math.abs(limbAfter - limbBefore));
-
-    if (blockDelta > (info.project.name === "mobile" ? 250 : 400) && limbDelta > 2_000) {
-      break;
-    }
-  }
-
-  expect(blockDelta).toBeGreaterThan(info.project.name === "mobile" ? 250 : 400);
-  expect(limbDelta).toBeGreaterThan(2_000);
-});
-
-test("calls to action remain clickable above the animation", async ({ page }) => {
-  await page.goto("/?test=1");
-  await ready(page);
-  const box = await bounds(page);
-
-  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.65);
-  await expect(page.locator(".primary")).toHaveAttribute("href", "https://app.compose.market/market");
+  await expect(page.locator(".primary")).toHaveAttribute("href", "https://app.compose.market/keys");
   await page.locator(".primary").evaluate((node) => {
     node.addEventListener("click", (event) => {
       event.preventDefault();
@@ -402,44 +345,4 @@ test("calls to action remain clickable above the animation", async ({ page }) =>
   });
   await page.locator(".primary").click();
   await expect(page.locator(".primary")).toHaveAttribute("data-clicked", "true");
-});
-
-test.describe("reduced motion", () => {
-  test.use({ contextOptions: { reducedMotion: "reduce" } });
-
-  test("keeps the scene calm while preserving block feedback", async ({ page }) => {
-    await page.goto("/?test=1&motion=reduce");
-    await ready(page);
-    const motion = await page.evaluate(() => document.querySelector(".hero")?.getAttribute("data-motion"));
-    expect(motion).toBe("reduce");
-    await page.waitForTimeout(220);
-
-    const box = await bounds(page);
-
-    const before = await sum(page, box.width * 0.48, box.height * 0.7, 160, 160);
-    const selector = page.viewportSize()?.width && page.viewportSize()!.width <= 700
-      ? ".secondary"
-      : ".card-b";
-    await page.locator(selector).scrollIntoViewIfNeeded();
-    const target = await page.locator(selector).boundingBox();
-
-    if (!target) {
-      throw new Error("Missing reduced-motion interaction target");
-    }
-
-    await page.mouse.move(target.x + target.width * 0.5, target.y + target.height * 0.5);
-    await page.waitForTimeout(320);
-    const after = await sum(page, box.width * 0.48, box.height * 0.7, 160, 160);
-    const feedback = await page.locator(selector).evaluate((node) => {
-      const style = getComputedStyle(node);
-      return {
-        hover: node.matches(":hover"),
-        shadow: style.boxShadow
-      };
-    });
-
-    expect(Math.abs(after - before)).toBeLessThan(80_000);
-    expect(feedback.hover).toBe(true);
-    expect(feedback.shadow).not.toBe("none");
-  });
 });
