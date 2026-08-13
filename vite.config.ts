@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 export default defineConfig({
@@ -10,5 +11,13 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 4178,
     strictPort: false
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("index.html", import.meta.url)),
+        manowar: fileURLToPath(new URL("manowar/index.html", import.meta.url))
+      }
+    }
   }
 });

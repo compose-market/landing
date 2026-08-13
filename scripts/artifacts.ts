@@ -1,7 +1,7 @@
 import path from "node:path";
 import { access, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import sharp from "sharp";
+import sharp, { type OutputInfo } from "sharp";
 
 type Point = {
   x: number;
@@ -19,7 +19,7 @@ type Spec = {
 
 type Raw = {
   data: Buffer;
-  info: sharp.OutputInfo;
+  info: OutputInfo;
 };
 
 type Box = {
