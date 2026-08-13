@@ -45,13 +45,13 @@ test("metrics helpers format live totals", () => {
   assert.deepEqual(metricValues(payload), {
     agents: "54",
     volume: "$1.235K",
-    sessions: "19",
+    settlements: "120",
     downloads: "2,258"
   });
   assert.deepEqual(metricDeltas(payload), {
     agents: "+2 today",
     volume: "+$0.457 today",
-    sessions: "+7 today",
+    settlements: "+35 today",
     downloads: "+26 today"
   });
 });
@@ -71,7 +71,7 @@ test("metric deltas show zero until daily metrics are provided", () => {
   }), {
     agents: "+0 today",
     volume: "+$0 today",
-    sessions: "+0 today",
+    settlements: "+0 today",
     downloads: "+0 today"
   });
 });
