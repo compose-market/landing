@@ -4,7 +4,7 @@ import {
   heroChip,
   organism,
   type PageUrls
-} from "./shared";
+} from "../animation/shared";
 
 export const title = "Compose.Market - The financial rails of AI autonomy";
 export const description =

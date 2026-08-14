@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import type { SceneMount, SceneOptions } from "./scene";
+import { heroSceneCenter } from "./layout";
 
 type Cubie = {
   index: number;
@@ -346,6 +347,8 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
   let posterTimer = 0;
   let posterCleared = false;
   let last = performance.now();
+  let sceneCenterY = window.innerHeight * 0.5;
+  let sceneBaseY = 0;
 
   const reduced = () => options.reduced ?? (forcedReduced || media.matches);
 
@@ -367,10 +370,17 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     const width = Math.max(1, stage.clientWidth || window.innerWidth);
     const height = Math.max(1, stage.clientHeight || window.innerHeight);
     const mobile = width < 700;
+    const narrow = width < 860;
     camera.aspect = width / height;
     camera.position.set(0, 0, mobile ? 19.5 : 16.5);
     camera.updateProjectionMatrix();
     cubeRoot.scale.setScalar(mobile ? 0.72 : 0.82);
+    sceneCenterY = narrow ? heroSceneCenter(root, height) : height * 0.5;
+    const visibleHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) * camera.position.z;
+    sceneBaseY = (height * 0.5 - sceneCenterY) / height * visibleHeight;
+    cubeRoot.position.y = sceneBaseY;
+    shell.style.setProperty("--inference-scene-y", `${sceneCenterY}px`);
+    renderer.domElement.dataset.sceneCenterY = sceneCenterY.toFixed(1);
     renderer.setPixelRatio(testing ? 1 : Math.min(mobile ? 1.4 : 1.8, window.devicePixelRatio || 1));
     renderer.setSize(width, height, false);
     buildAmbientRails();
@@ -515,7 +525,7 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     }
   };
 
-  const createAmbientRail = (path: string, index: number, strong: boolean): void => {
+  const createAmbientRail = (path: string, index: number, strong: boolean, speedMultiplier = 1): void => {
     const group = document.createElementNS(svgNamespace, "g");
     const trace = document.createElementNS(svgNamespace, "path");
     const core = document.createElementNS(svgNamespace, "path");
@@ -541,7 +551,7 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
       core,
       packet,
       phase: (index * 0.173) % 1,
-      speed: strong ? 0.105 + (index % 3) * 0.012 : 0.065 + (index % 4) * 0.009
+      speed: (strong ? 0.105 + (index % 3) * 0.012 : 0.065 + (index % 4) * 0.009) * speedMultiplier
     });
   };
 
@@ -560,13 +570,13 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     const width = Math.ceil(window.innerWidth / grid) * grid;
     const height = Math.ceil(window.innerHeight / grid) * grid;
     const centerX = Math.round((width * 0.5) / grid) * grid;
-    const centerY = Math.round((height * 0.5) / grid) * grid;
+    const centerY = Math.round(sceneCenterY / grid) * grid;
     const mobile = window.innerWidth < 700;
     const cavityX = mobile ? grid * 2.5 : grid * 4.2;
     const cavityY = mobile ? grid * 3 : grid * 3.4;
     const paths: Array<{ path: string; strong: boolean }> = [];
-    const horizontalRows = mobile ? 8 : 12;
-    const verticalColumns = mobile ? 5 : 8;
+    const horizontalRows = mobile ? 10 : 12;
+    const verticalColumns = mobile ? 7 : 8;
 
     for (let index = 0; index < horizontalRows; index += 1) {
       const y = Math.round(((index + 1) * height / (horizontalRows + 1)) / grid) * grid;
@@ -587,19 +597,19 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     for (let index = 0; index < verticalColumns; index += 1) {
       const x = Math.round(((index + 1) * width / (verticalColumns + 1)) / grid) * grid;
 
-      if (Math.abs(x - centerX) < cavityX + grid) {
-        continue;
-      }
-
       const gateY = centerY + (index % 2 ? -cavityY - grid : cavityY + grid);
       const offsetX = index % 2 ? grid : -grid;
+      const insideCavity = Math.abs(x - centerX) < cavityX + grid;
+      const routeX = centerX + (index % 2 ? -1 : 1) * (cavityX + grid);
       paths.push({
-        path: `M ${x} -${grid} V ${gateY} H ${x + offsetX} V ${height + grid}`,
+        path: insideCavity
+          ? `M ${x} -${grid} V ${centerY - cavityY - grid} H ${routeX} V ${centerY + cavityY + grid} H ${x} V ${height + grid}`
+          : `M ${x} -${grid} V ${gateY} H ${x + offsetX} V ${height + grid}`,
         strong: index % 3 === 1
       });
     }
 
-    paths.forEach(({ path, strong }, index) => createAmbientRail(path, index, strong));
+    paths.forEach(({ path, strong }, index) => createAmbientRail(path, index, strong, mobile ? 1.7 : 1));
   };
 
   const clearTouchInteraction = (): void => {
@@ -949,7 +959,7 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     cubeRoot.rotation.y = damp(cubeRoot.rotation.y, -0.66 + lookX, 4.2, dt);
     cubeRoot.rotation.x = damp(cubeRoot.rotation.x, 0.53 - lookY, 4.2, dt);
     cubeRoot.position.x = damp(cubeRoot.position.x, pointerActive && !reduced() ? pointer.x * 0.13 : 0, 3.8, dt);
-    cubeRoot.position.y = damp(cubeRoot.position.y, pointerActive && !reduced() ? pointer.y * 0.09 : 0, 3.8, dt);
+    cubeRoot.position.y = damp(cubeRoot.position.y, sceneBaseY + (pointerActive && !reduced() ? pointer.y * 0.09 : 0), 3.8, dt);
 
     for (const cubie of cubies) {
       const target = cubie.index === activeIndex ? 1 : 0;
@@ -998,6 +1008,8 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     dirty = true;
   });
   observer.observe(stage);
+  observer.observe(hero.querySelector<HTMLElement>(".hero-title") ?? hero);
+  observer.observe(hero.querySelector<HTMLElement>(".protocol") ?? hero);
   interactionHost.addEventListener("pointermove", move);
   interactionHost.addEventListener("pointerdown", down);
   interactionHost.addEventListener("pointerup", up);
@@ -1058,6 +1070,7 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
       clearAmbientRails();
       ambientRailLayer.remove();
       railLayer.remove();
+      shell.style.removeProperty("--inference-scene-y");
       renderer.dispose();
       renderer.domElement.remove();
     }
