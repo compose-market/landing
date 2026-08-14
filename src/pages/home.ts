@@ -1,5 +1,5 @@
-import { dashboardDemo } from "./dashboard";
-import { pollMetrics, type MetricKey } from "./metrics";
+import { dashboardDemo } from "../dashboard";
+import { pollMetrics, type MetricKey } from "../metrics";
 import {
   appUrl,
   deferUntilNear,
@@ -7,7 +7,7 @@ import {
   heroChip,
   organism,
   type PageUrls
-} from "./shared";
+} from "../animation/shared";
 
 export {
   formatMetricCount,
@@ -17,12 +17,12 @@ export {
   metricsUrl,
   type MetricKey,
   type MetricsPayload
-} from "./metrics";
-export { Strand, fade, focus, net, pulse, type Hit, type Net, type Vec } from "./model";
-export type { Mount, PageOptions, PageUrls } from "./shared";
+} from "../metrics";
+export { Strand, fade, focus, net, pulse, type Hit, type Net, type Vec } from "../animation/model";
+export type { Mount, PageOptions, PageUrls } from "../animation/shared";
 
 /** @deprecated Use PageOptions. */
-export type MountOptions = import("./shared").PageOptions;
+export type MountOptions = import("../animation/shared").PageOptions;
 
 type PartnerLogo = { src: string; alt: string };
 type PartnerBadge = PartnerLogo & {
@@ -325,7 +325,7 @@ export function render(urls: PageUrls): string {
             <div class="steps">
               <div class="step"><span class="cm-icon">01</span><span>Track spending, token use and duration <strong class="section-em">of any single call</strong>.</span></div>
               <div class="step"><span class="cm-icon">02</span><span>Filter by <code class="section-token">network</code>, <code class="section-token">model</code> or <code class="section-token">date</code> for fully granular analytics.</span></div>
-              <div class="step"><span class="cm-icon">03</span><span>Deploy, lease, and earn <strong class="section-em">royalties</strong> from reusable compositions.</span></div>
+              <div class="step"><span class="cm-icon">03</span><span>See your receipts, with <strong class="section-em">tokens spent</strong>, <strong class="section-em">model used</strong>, and <strong class="section-em">TX hash</strong>.</span></div>
             </div>
           </div>
           ${dashboardDemo()}

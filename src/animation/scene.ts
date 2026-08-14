@@ -13,6 +13,7 @@ import {
   type Hit,
   type Vec
 } from "./model";
+import { heroSceneCenter } from "./layout";
 
 export type SceneMount = {
   destroy: () => void;
@@ -90,12 +91,12 @@ function spin(point: Vec, origin: Vec, angle: number): Vec {
   };
 }
 
-function body(w: number, h: number): Body {
+function body(w: number, h: number, focalY = h * 0.5): Body {
   const wide = w >= 860;
   const bw = clamp(w * (wide ? 0.414 : 0.738), 288, 630);
   const bh = bw * 0.42;
   const cx = w * 0.5;
-  const y = wide ? h * 0.22 : h * 0.25;
+  const y = wide ? h * 0.22 : focalY - bw * 0.62;
   return { x: cx - bw * 0.5, y, w: bw, h: bh };
 }
 
@@ -956,6 +957,7 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
   });
 
   renderer.domElement.className = "scene";
+  renderer.domElement.dataset.sceneCanvas = "manowar";
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   stage.append(renderer.domElement);
@@ -1326,7 +1328,7 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     const w = Math.max(1, Math.round(rect.width));
     const h = Math.max(1, Math.round(rect.height));
 
-    renderer.setPixelRatio(testing ? 1 : Math.min(2, window.devicePixelRatio || 1));
+    renderer.setPixelRatio(testing ? 1 : Math.min(w < 700 ? 1.4 : 2, window.devicePixelRatio || 1));
     renderer.setSize(w, h, false);
     camera.left = 0;
     camera.right = w;
@@ -1335,7 +1337,10 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     camera.updateProjectionMatrix();
 
     grid = net(w, h, w < 700 ? 54 : 64);
-    b = body(w, h);
+    const sceneCenterY = w < 860 ? heroSceneCenter(root, h) : h * 0.5;
+    b = body(w, h, sceneCenterY);
+    hero.style.setProperty("--scene-body-top", `${b.y}px`);
+    renderer.domElement.dataset.sceneCenterY = sceneCenterY.toFixed(1);
     seaMesh.scale.set(w, h, 1);
     seaMesh.position.set(w * 0.5, h * 0.5, -90);
     (sea.uniforms.uResolution.value as THREE.Vector2).set(w, h);
@@ -1609,6 +1614,12 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
 
     if (activeCell) {
       pulse(grid, activeCell, nowReduced ? 0.76 : testing ? 3.5 : 1.72);
+    } else if (!nowReduced && grid.w < 860) {
+      const idlePhase = time * 0.001;
+      pulse(grid, {
+        x: grid.w * (0.5 + Math.sin(idlePhase * 0.78) * 0.36),
+        y: grid.h * (0.44 + Math.cos(idlePhase * 0.61) * 0.3)
+      }, testing ? 0.42 : 0.3);
     }
 
     fade(grid, nowReduced ? 0.965 : testing ? 0.985 : 0.925);
@@ -1623,6 +1634,9 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     braid = clamp(braid + (braidWant - braid) * (braidWant > braid ? 0.18 : 0.055) * rate, 0, 1);
     line = clamp(line + (lineWant - line) * (lineWant > line ? 0.18 : 0.055) * rate, 0, 1);
     const activeBase = hit?.strength ?? 0;
+    renderer.domElement.dataset.binaryPulseX = nowReduced || grid.w >= 860
+      ? "none"
+      : (grid.w * (0.5 + Math.sin(time * 0.001 * 0.78) * 0.36)).toFixed(1);
     const blockActive = nowReduced
       ? 0
       : clamp(activeBase * (grid.w < 700 ? 1.45 : 1.18) + (activeCell ? 0.08 : 0), 0, 1);
@@ -1741,6 +1755,9 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     dirty = true;
   });
   observer.observe(hero);
+  observer.observe(panel);
+  observer.observe(panel.querySelector<HTMLElement>(".hero-title") ?? panel);
+  observer.observe(panel.querySelector<HTMLElement>(".protocol") ?? panel);
   hero.addEventListener("pointermove", move);
   hero.addEventListener("pointerdown", down);
   hero.addEventListener("touchstart", touch, { passive: true });
@@ -1859,6 +1876,7 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
         cord.mesh.geometry.dispose();
         cord.mesh.material.dispose();
       }
+      hero.style.removeProperty("--scene-body-top");
       renderer.dispose();
     }
   };

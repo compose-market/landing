@@ -3,7 +3,7 @@ import "@compose-market/theme/css/dark";
 import "@compose-market/theme/css/app";
 import "@compose-market/theme/css/effects";
 import "@compose-market/theme/css/utilities";
-import "./style.css";
+import "../style.css";
 import {
   appUrl,
   backdropHtml,
@@ -15,7 +15,7 @@ import {
   type PageId,
   type PageModule,
   type PageUrls
-} from "./shared";
+} from "../animation/shared";
 import * as inference from "./home";
 import * as manowar from "./manowar";
 import { inject } from "@vercel/analytics";

@@ -37,7 +37,7 @@ canvas {
   --page-gap: clamp(0.58rem, 1.7vw, 1.3rem);
   --page-band: 74rem;
   --section-pad: clamp(0.78rem, 2.7vw, 2.35rem);
-  --scene-body-top: 25dvh;
+  --scene-body-top: 20dvh;
   --scene-body-width: clamp(288px, 73.8vw, 630px);
   --scene-body-height: calc(var(--scene-body-width) * 0.42);
   --scene-head-width: calc(var(--scene-body-width) * 0.9);
@@ -157,7 +157,7 @@ canvas {
   overflow: visible;
   pointer-events: none;
   mix-blend-mode: screen;
-  mask-image: radial-gradient(ellipse 10.5rem 10.75rem at 50% 50%, transparent 0 98%, #000 100%);
+  mask-image: radial-gradient(ellipse 10.5rem 10.75rem at 50% var(--inference-scene-y, 50%), transparent 0 98%, #000 100%);
 }
 
 .inference-ambient-rail-layer {
@@ -170,7 +170,7 @@ canvas {
   pointer-events: none;
   mix-blend-mode: screen;
   opacity: 0.78;
-  mask-image: radial-gradient(ellipse 10.5rem 10.75rem at 50% 50%, transparent 0 98%, #000 100%);
+  mask-image: radial-gradient(ellipse 10.5rem 10.75rem at 50% var(--inference-scene-y, 50%), transparent 0 98%, #000 100%);
 }
 
 .shell[data-scene="inference"] .stage {
@@ -237,7 +237,7 @@ canvas {
 @media (max-width: 699px) {
   .inference-rail-layer,
   .inference-ambient-rail-layer {
-    mask-image: radial-gradient(ellipse 9.5rem 10rem at 50% 50%, transparent 0 98%, #000 100%);
+    mask-image: radial-gradient(ellipse 9.5rem 10rem at 50% var(--inference-scene-y, 50%), transparent 0 98%, #000 100%);
   }
 
   .inference-ambient-rail__trace {
@@ -1412,6 +1412,7 @@ canvas {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr));
   gap: clamp(1rem, 4vw, 2.5rem);
   align-items: stretch;
+  padding-inline: 1rem;
 }
 
 .workflow::after {

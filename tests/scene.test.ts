@@ -13,7 +13,7 @@ import {
   net,
   pulse,
   type Hit
-} from "../src/home.ts";
+} from "../src/pages/home.ts";
 
 test("metrics helpers format live totals", () => {
   assert.equal(metricsUrl("https://api.compose.market/"), "https://api.compose.market/api/metrics");

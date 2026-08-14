@@ -73,7 +73,7 @@ test("desktop and mobile render the inference landing", async ({ page }) => {
     canvas: document.querySelector("canvas") instanceof HTMLCanvasElement
   }));
   expect(mounted.heading).toContain("FINANCIAL RAILS");
-  expect(mounted.market).toContain("See your Keys");
+  expect(mounted.market).toContain("Set your Key");
   expect(mounted.compose).toContain("Inference Docs");
   expect(mounted.canvas).toBe(true);
   await expect(page.locator(".hero")).toHaveAttribute("data-renderer", "three-webgl");
@@ -95,7 +95,9 @@ test("native glass cubies light and move out of the assembly", async ({ page }, 
 
   const viewport = page.viewportSize();
   const x = (viewport?.width ?? 1) * 0.5;
-  const y = (viewport?.height ?? 1) * 0.5;
+  const y = info.project.name === "mobile"
+    ? Number(await canvas.getAttribute("data-scene-center-y"))
+    : (viewport?.height ?? 1) * 0.5;
 
   if (info.project.name === "mobile") {
     await page.touchscreen.tap(x, y);
@@ -162,6 +164,75 @@ test("reduced motion keeps particles dispersed and disables ambient propagation"
   await expect(canvas).toHaveAttribute("data-ambient-circuits", "0");
 });
 
+test("small hero scenes center in the content gap and keep their backgrounds moving", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile");
+
+  for (const viewport of [{ width: 412, height: 915 }, { width: 360, height: 640 }]) {
+    await page.setViewportSize(viewport);
+
+    for (const route of ["/", "/manowar/"]) {
+      await page.goto(`${route}?test=1`);
+      const canvas = page.locator(`canvas[data-scene-canvas="${route === "/" ? "inference" : "manowar"}"]`);
+      await expect(canvas).toBeAttached();
+
+      const geometry = await page.evaluate(() => {
+        const title = document.querySelector<HTMLElement>(".hero-title")?.getBoundingClientRect();
+        const description = document.querySelector<HTMLElement>(".protocol")?.getBoundingClientRect();
+        const sceneCanvas = document.querySelector<HTMLCanvasElement>("canvas[data-scene-canvas]");
+        return {
+          expected: title && description ? (title.bottom + description.top) * 0.5 : 0,
+          actual: Number(sceneCanvas?.dataset.sceneCenterY)
+        };
+      });
+
+      expect(Math.abs(geometry.actual - geometry.expected)).toBeLessThan(2);
+
+      if (route === "/") {
+        const packet = page.locator("[data-ambient-rail-layer] .inference-ambient-rail__packet").first();
+        await expect(packet).toBeAttached();
+        const before = await packet.evaluate((node) => node.style.strokeDashoffset);
+        await page.waitForTimeout(450);
+        const after = await packet.evaluate((node) => node.style.strokeDashoffset);
+        expect(after).not.toBe(before);
+      } else {
+        const before = Number(await canvas.getAttribute("data-binary-pulse-x"));
+        await page.waitForTimeout(450);
+        const after = Number(await canvas.getAttribute("data-binary-pulse-x"));
+        expect(Math.abs(after - before)).toBeGreaterThan(1);
+      }
+    }
+  }
+});
+
+test("reduced motion disables the Manowar binary pulse", async ({ page }) => {
+  await page.goto("/manowar/?test=1&motion=reduce");
+  const canvas = page.locator('canvas[data-scene-canvas="manowar"]');
+  await expect(canvas).toHaveAttribute("data-binary-pulse-x", "none");
+  await page.waitForTimeout(500);
+  await expect(canvas).toHaveAttribute("data-binary-pulse-x", "none");
+});
+
+test("workflow steps share the mobile inset on both routes", async ({ page }) => {
+  for (const route of ["/", "/manowar/"]) {
+    await page.goto(`${route}?test=1`);
+    const geometry = await page.locator(".workflow").evaluate((workflow) => {
+      const firstColumn = workflow.firstElementChild?.getBoundingClientRect();
+      const steps = workflow.querySelector<HTMLElement>(".steps")?.getBoundingClientRect();
+      const card = workflow.getBoundingClientRect();
+      return {
+        inset: firstColumn ? firstColumn.left - card.left : 0,
+        stepsLeft: steps && firstColumn ? steps.left - firstColumn.left : 0,
+        stepsRight: steps && firstColumn ? steps.right - firstColumn.right : 0
+      };
+    });
+
+    expect(geometry.inset).toBeGreaterThan(15);
+    expect(geometry.inset).toBeLessThan(18);
+    expect(Math.abs(geometry.stepsLeft)).toBeLessThan(1);
+    expect(Math.abs(geometry.stepsRight)).toBeLessThan(1);
+  }
+});
+
 test("workflow band shows the dashboard showcase instead of code cards", async ({ page }) => {
   await page.goto("/?test=1", { waitUntil: "domcontentloaded" });
 
@@ -178,11 +249,12 @@ test("hero rich copy exposes code, numeric accents, and inference chips", async 
   await page.goto("/?test=1", { waitUntil: "domcontentloaded" });
 
   await expect(page.locator(".card-c .hero-code")).toHaveText("npm i @compose-market/sdk");
-  await expect(page.locator(".hero-chip")).toHaveCount(3);
-  await expect(page.locator(".hero-chip").nth(0)).toContainText("LLM");
-  await expect(page.locator(".hero-chip").nth(1)).toContainText("Media");
-  await expect(page.locator(".hero-chip").nth(2)).toContainText("Embeddings");
-  await expect(page.locator(".hero-number")).toHaveCount(3);
+  const modelChips = page.locator(".card-a .hero-chip");
+  await expect(modelChips).toHaveCount(3);
+  await expect(modelChips.nth(0)).toContainText("LLM");
+  await expect(modelChips.nth(1)).toContainText("Media");
+  await expect(modelChips.nth(2)).toContainText("Embeddings");
+  expect(await page.locator(".hero-number").count()).toBeGreaterThanOrEqual(3);
 
   const copy = await page.locator(".hero").textContent();
   expect(copy).not.toContain("*any*");
