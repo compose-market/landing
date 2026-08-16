@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("compose_consent_v1", JSON.stringify({ preference: "essential", timestamp: new Date(0).toISOString() }));
+  });
+});
+
 async function ready(page: import("@playwright/test").Page, marker: string, expectScene = true) {
   for (let i = 0; i < 80; i += 1) {
     const ok = await page.evaluate(({ text, expectScene }) => {

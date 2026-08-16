@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("compose_consent_v1", JSON.stringify({ preference: "essential", timestamp: new Date(0).toISOString() }));
+  });
+});
+
 async function ready(page: import("@playwright/test").Page) {
   for (let i = 0; i < 80; i += 1) {
     const ok = await page.evaluate(() => {
@@ -77,6 +83,107 @@ test("desktop and mobile render the inference landing", async ({ page }) => {
   expect(mounted.compose).toContain("Inference Docs");
   expect(mounted.canvas).toBe(true);
   await expect(page.locator(".hero")).toHaveAttribute("data-renderer", "three-webgl");
+});
+
+test("model count and metric glyphs use the requested live sources", async ({ page }) => {
+  await page.route("https://models.compose.market/health", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ service: "models", ok: true, models: 750 })
+  }));
+  await page.goto("/?test=1");
+
+  const models = page.locator('[data-metric="models"]');
+  const downloads = page.locator('[data-metric="downloads"]');
+  await expect(models.locator(".stat-label")).toHaveText("Models Served");
+  await expect(models.locator("strong")).toHaveText("750");
+  await expect(page.locator('[data-metric="agents"]')).toHaveCount(0);
+
+  const paths = async (selector: string) => page.locator(selector).locator("path").evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("d"))
+  );
+  expect(await paths('[data-metric="models"] .stat-icon svg')).toEqual(
+    await paths('.workflow-panel .hero-chip:has-text("Model Analytics") svg')
+  );
+  expect(await paths('[data-metric="downloads"] .stat-icon svg')).toEqual(
+    await paths('.card-c .hero-chip:has-text("SDK") svg')
+  );
+  await expect(downloads.locator(".stat-label")).toHaveText("SDK Downloads");
+});
+
+test("normal production frames omit test instrumentation", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+
+  const canvas = page.locator('canvas[data-scene-canvas="inference"]');
+  await expect(canvas).not.toHaveAttribute("data-particle-spread", /.+/);
+  await expect(canvas).not.toHaveAttribute("data-active-circuits", /.+/);
+  await expect(canvas).not.toHaveAttribute("data-ambient-circuits", /.+/);
+});
+
+test("ambient rails cross behind the cube without drawing a rectangular frame", async ({ page }) => {
+  await page.goto("/?test=1");
+  await ready(page);
+
+  const paths = await page.locator('[data-ambient-rail="true"] .inference-ambient-rail__trace').evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("d") ?? "")
+  );
+  expect(paths.length).toBeGreaterThan(12);
+  for (const path of paths) {
+    const horizontal = (path.match(/H/g) ?? []).length;
+    const vertical = (path.match(/V/g) ?? []).length;
+    expect(horizontal > 1 && vertical > 1).toBe(false);
+  }
+});
+
+test("rapid target changes keep one egress source and one precise outward cubie", async ({ page }, info) => {
+  await page.goto("/?test=1");
+  await ready(page);
+
+  const canvas = page.locator('canvas[data-scene-canvas="inference"]');
+  const first = page.locator(info.project.name === "mobile" ? ".primary" : ".card-a");
+  const second = page.locator(info.project.name === "mobile" ? ".secondary" : ".card-d");
+  const activate = async (target: typeof first) => {
+    if (info.project.name === "mobile") {
+      await target.focus();
+    } else {
+      const box = await target.boundingBox();
+      if (!box) throw new Error("Missing interaction target");
+      await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+    }
+  };
+
+  await activate(first);
+  const egress = page.locator('[data-rail-layer="inference"] [data-direction="egress"]');
+  await expect.poll(() => egress.count()).toBeGreaterThanOrEqual(2);
+  const firstCubie = await canvas.getAttribute("data-active-cubie");
+  expect(firstCubie).not.toBe("none");
+  expect(new Set(await egress.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-cubie-index"))))).toEqual(
+    new Set([firstCubie])
+  );
+  const retiringRails = await egress.elementHandles();
+
+  await activate(second);
+  expect(await Promise.all(retiringRails.map((rail) => rail.evaluate((node) => node.isConnected)))).not.toContain(false);
+  await expect.poll(() => canvas.getAttribute("data-active-cubie")).not.toBe(firstCubie);
+  const secondCubie = await canvas.getAttribute("data-active-cubie");
+  expect(secondCubie).not.toBe("none");
+  const secondEgress = page.locator(`[data-rail-layer="inference"] [data-direction="egress"][data-cubie-index="${secondCubie}"]`);
+  await expect.poll(() => secondEgress.count()).toBeGreaterThanOrEqual(2);
+  await page.waitForTimeout(160);
+  expect(Number(await canvas.getAttribute("data-outward-cubies"))).toBeLessThanOrEqual(1);
+
+  const currentRails = await secondEgress.elementHandles();
+  if (info.project.name === "mobile") {
+    await second.focus();
+  } else {
+    const box = await second.boundingBox();
+    if (!box) throw new Error("Missing interaction target");
+    await page.mouse.move(box.x + box.width * 0.58, box.y + box.height * 0.58);
+  }
+  await page.waitForTimeout(100);
+  await expect.poll(() => secondEgress.count()).toBeGreaterThanOrEqual(2);
+  expect(await Promise.all(currentRails.map((rail) => rail.evaluate((node) => node.isConnected)))).not.toContain(false);
 });
 
 test("native glass cubies light and move out of the assembly", async ({ page }, info) => {
@@ -320,29 +427,58 @@ test("scrolling lands on panel snap points", async ({ page }) => {
   }
 });
 
-test("partner badges use NVIDIA and Microsoft and fill their frames", async ({ page }) => {
-  await page.goto("/?test=1");
-  await ready(page);
-  await scrollToPanel(page, ".partners-panel");
-  await expect(page.locator(".cm-partner-badge img")).toHaveCount(2);
-  await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>(".cm-partner-badge img")]
-    .every((node) => node.complete && node.naturalWidth > 0));
+test("partner badges tightly and responsively fill their frames", async ({ page }, info) => {
+  const viewports = info.project.name === "mobile"
+    ? [{ width: 320, height: 568 }, { width: 360, height: 640 }, { width: 412, height: 915 }]
+    : [{ width: 768, height: 700 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }];
 
-  const badges = await page.locator(".cm-partner-badge img").evaluateAll((nodes) => nodes.map((node) => {
-    const image = node.getBoundingClientRect();
-    const frame = node.closest(".cm-partner-badge")?.getBoundingClientRect();
-    return {
-      alt: node.getAttribute("alt") ?? "",
-      widthFill: frame ? image.width / frame.width : 0,
-      heightFill: frame ? image.height / frame.height : 0
-    };
-  }));
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto("/?test=1");
+    await ready(page);
+    await scrollToPanel(page, ".partners-panel");
+    await expect(page.locator(".cm-partner-badge img")).toHaveCount(2);
+    await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>(".cm-partner-badge img")]
+      .every((node) => node.complete && node.naturalWidth > 0));
 
-  expect(badges.map((badge) => badge.alt)).toEqual([
-    "NVIDIA Inception Program",
-    "Microsoft for Startups"
-  ]);
-  expect(badges.every((badge) => Math.max(badge.widthFill, badge.heightFill) > 0.55)).toBe(true);
+    const layout = await page.locator(".cm-partner-badge img").evaluateAll((nodes) => nodes.map((node) => {
+      const badgeImage = node as HTMLImageElement;
+      const image = badgeImage.getBoundingClientRect();
+      const frameNode = node.closest<HTMLElement>(".cm-partner-badge");
+      const group = node.closest<HTMLElement>(".cm-partners__badges");
+      const frame = frameNode?.getBoundingClientRect();
+      const style = frameNode ? getComputedStyle(frameNode) : null;
+      const borderX = style ? parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth) : 0;
+      const borderY = style ? parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth) : 0;
+      return {
+        alt: badgeImage.alt,
+        declaredWidth: Number(badgeImage.getAttribute("width")),
+        declaredHeight: Number(badgeImage.getAttribute("height")),
+        naturalRatio: badgeImage.naturalWidth / badgeImage.naturalHeight,
+        renderedRatio: image.width / image.height,
+        widthGap: frame ? Math.abs(frame.width - borderX - image.width) : Infinity,
+        heightGap: frame ? Math.abs(frame.height - borderY - image.height) : Infinity,
+        insideFrame: frame
+          ? image.left >= frame.left && image.right <= frame.right && image.top >= frame.top && image.bottom <= frame.bottom
+          : false,
+        groupOverflow: group ? group.scrollWidth - group.clientWidth : Infinity
+      };
+    }));
+
+    expect(layout.map((badge) => badge.alt)).toEqual([
+      "NVIDIA Inception Program",
+      "Microsoft for Startups"
+    ]);
+    for (const badge of layout) {
+      expect(badge.declaredWidth).toBeGreaterThan(0);
+      expect(badge.declaredHeight).toBeGreaterThan(0);
+      expect(badge.widthGap).toBeLessThanOrEqual(1);
+      expect(badge.heightGap).toBeLessThanOrEqual(1);
+      expect(Math.abs(badge.renderedRatio - badge.naturalRatio)).toBeLessThan(0.01);
+      expect(badge.insideFrame).toBe(true);
+      expect(badge.groupOverflow).toBeLessThanOrEqual(1);
+    }
+  }
 });
 
 test("partner logos match the web home tile treatment", async ({ page }, info) => {
@@ -402,6 +538,74 @@ test("partner logos match the web home tile treatment", async ({ page }, info) =
     expect(hover.filter).toContain("grayscale(0)");
     expect(Number(hover.opacity)).toBeGreaterThan(0.95);
   }
+});
+
+test("mobile footers keep only external links and copyright in one row", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile");
+
+  for (const viewport of [{ width: 320, height: 568 }, { width: 412, height: 915 }]) {
+    await page.setViewportSize(viewport);
+
+    for (const route of ["/", "/terms/"]) {
+      await page.goto(`${route}?test=1`);
+      if (route === "/") {
+        await ready(page);
+        await scrollToPanel(page, ".final-panel");
+      }
+
+      const footer = page.locator(".footer");
+      await expect(footer).toBeVisible();
+      await expect(footer.locator("a:visible")).toHaveText(["Docs", "GitHub", "X"]);
+      await expect(footer.locator("[data-page-link]:visible")).toHaveCount(0);
+
+      const layout = await footer.evaluate((node) => {
+        const nav = node.querySelector("nav")?.getBoundingClientRect();
+        const links = [...node.querySelectorAll<HTMLAnchorElement>("nav a")]
+          .filter((link) => getComputedStyle(link).display !== "none")
+          .map((link) => link.getBoundingClientRect());
+        const copyright = node.querySelector(":scope > span")?.getBoundingClientRect();
+        const bounds = node.getBoundingClientRect();
+        return {
+          display: getComputedStyle(node).display,
+          direction: getComputedStyle(node).flexDirection,
+          fontSize: parseFloat(getComputedStyle(node).fontSize),
+          sameRow: nav && copyright ? Math.abs((nav.top + nav.height / 2) - (copyright.top + copyright.height / 2)) : Infinity,
+          linkGaps: links.slice(1).map((link, index) => link.left - links[index]!.right),
+          overflow: node.scrollWidth - node.clientWidth,
+          contained: nav && copyright
+            ? nav.left >= bounds.left && copyright.right <= bounds.right
+            : false
+        };
+      });
+
+      expect(layout.display).toBe("flex");
+      expect(layout.direction).toBe("row");
+      expect(layout.fontSize).toBeGreaterThanOrEqual(10.8);
+      expect(layout.sameRow).toBeLessThanOrEqual(1);
+      expect(Math.max(...layout.linkGaps)).toBeLessThanOrEqual(layout.fontSize * 1.1);
+      expect(layout.overflow).toBeLessThanOrEqual(1);
+      expect(layout.contained).toBe(true);
+    }
+  }
+});
+
+test("mobile navdock keeps active buttons without the outer halo", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile");
+  await page.goto("/?test=1");
+  await ready(page);
+
+  const navItems = page.locator(".cm-app-chrome__navitem");
+  await expect(navItems).toHaveCount(2);
+  const styles = await navItems.evaluateAll((nodes) => nodes.map((node) => ({
+    halo: getComputedStyle(node, "::before").display,
+    width: node.getBoundingClientRect().width,
+    height: node.getBoundingClientRect().height,
+    active: node.getAttribute("data-active")
+  })));
+
+  expect(styles.every((style) => style.halo === "none")).toBe(true);
+  expect(styles.every((style) => style.width > 35 && style.height > 35)).toBe(true);
+  expect(styles.some((style) => style.active === "true")).toBe(true);
 });
 
 test("calls to action remain clickable", async ({ page }) => {

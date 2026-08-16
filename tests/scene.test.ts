@@ -10,6 +10,8 @@ import {
   metricDeltas,
   metricValues,
   metricsUrl,
+  modelCount,
+  modelsHealthUrl,
   net,
   pulse,
   type Hit
@@ -18,6 +20,11 @@ import {
 test("metrics helpers format live totals", () => {
   assert.equal(metricsUrl("https://api.compose.market/"), "https://api.compose.market/api/metrics");
   assert.equal(metricsUrl("api.compose.market"), "https://api.compose.market/api/metrics");
+  assert.equal(modelsHealthUrl("https://models.compose.market/"), "https://models.compose.market/health");
+  assert.equal(modelsHealthUrl("models.compose.market"), "https://models.compose.market/health");
+  assert.equal(modelCount({ models: 750 }), 750);
+  assert.equal(modelCount({ models: -1 }), undefined);
+  assert.equal(modelCount({ models: "750" }), undefined);
   assert.equal(formatMetricCount(2258), "2,258");
   assert.equal(formatMetricUsdc("5885.25"), "$5.885K");
   const payload = {
@@ -42,14 +49,14 @@ test("metrics helpers format live totals", () => {
       downloads: 26
     }
   };
-  assert.deepEqual(metricValues(payload), {
-    agents: "54",
+  assert.deepEqual(metricValues(payload, 750), {
+    models: "750",
     volume: "$1.235K",
     settlements: "120",
     downloads: "2,258"
   });
   assert.deepEqual(metricDeltas(payload), {
-    agents: "+2 today",
+    models: "",
     volume: "+$0.457 today",
     settlements: "+35 today",
     downloads: "+26 today"
@@ -69,7 +76,7 @@ test("metric deltas show zero until daily metrics are provided", () => {
       downloads: 1
     }
   }), {
-    agents: "+0 today",
+    models: "",
     volume: "+$0 today",
     settlements: "+0 today",
     downloads: "+0 today"
