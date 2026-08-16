@@ -12,7 +12,8 @@ export type PageOptions = SceneOptions & {
   docs?: string;
 };
 
-export type PageId = "inference" | "manowar";
+export type PageId = "inference" | "manowar" | "terms" | "privacy";
+type NavPageId = "inference" | "manowar";
 
 export type PageUrls = {
   appBase: string;
@@ -32,7 +33,7 @@ export type PageModule = {
 const navIcons = {
   inference: '<rect width="16" height="16" x="4" y="4" rx="2" /><rect width="6" height="6" x="9" y="9" /><path d="M15 2v2" /><path d="M15 20v2" /><path d="M2 15h2" /><path d="M2 9h2" /><path d="M20 15h2" /><path d="M20 9h2" /><path d="M9 2v2" /><path d="M9 20v2" />',
   manowar: '<path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" />'
-} satisfies Record<PageId, string>;
+} satisfies Record<NavPageId, string>;
 
 const heroIcons = {
   reasoning: '<path d="M12 3v3" /><path d="M18.36 5.64 16.24 7.76" /><path d="M21 12h-3" /><path d="m18.36 18.36-2.12-2.12" /><path d="M12 21v-3" /><path d="m5.64 18.36 2.12-2.12" /><path d="M3 12h3" /><path d="m5.64 5.64 2.12 2.12" /><circle cx="12" cy="12" r="3.2" />',
@@ -80,11 +81,17 @@ function scenePosterHtml(page: PageId): string {
     return `<div class="scene-poster scene-poster--inference" data-scene-poster="inference"></div>`;
   }
 
-  return `
-          <div class="scene-poster scene-poster--manowar">
+  if (page === "manowar") {
+    return `
+          <div class="scene-poster scene-poster--manowar" data-scene-poster="manowar">
             <img class="scene-poster__tentacles" src="/artifacts/tentacles.webp" width="900" height="1180" alt="" decoding="async" fetchpriority="high" draggable="false" crossorigin="anonymous" />
             <img class="scene-poster__head" src="/artifacts/head.webp" width="900" height="330" alt="" decoding="async" fetchpriority="high" draggable="false" crossorigin="anonymous" />
           </div>`;
+  }
+
+  // Legal pages render a clean CSS-only backdrop (grid, gradient, scanline)
+  // with no 3D scene poster.
+  return "";
 }
 
 export function backdropHtml(page: PageId = "inference"): string {
@@ -101,14 +108,21 @@ ${scenePosterHtml(page)}
 }
 
 export function pagePath(page: PageId): string {
-  return page === "manowar" ? "/manowar/" : "/";
+  if (page === "manowar") return "/manowar/";
+  if (page === "terms") return "/terms/";
+  if (page === "privacy") return "/privacy/";
+  return "/";
 }
 
 export function pageFromPath(pathname: string): PageId {
-  return pathname.replace(/\/+$/, "") === "/manowar" ? "manowar" : "inference";
+  const normalized = pathname.replace(/\/+$/, "");
+  if (normalized === "/manowar") return "manowar";
+  if (normalized === "/terms") return "terms";
+  if (normalized === "/privacy") return "privacy";
+  return "inference";
 }
 
-function navItem(page: PageId, label: string): string {
+function navItem(page: NavPageId, label: string): string {
   return `<a class="cm-app-chrome__navitem" href="${pagePath(page)}" data-page-link="${page}" data-active="false" aria-label="${label}" title="${label}"><span class="cm-app-chrome__navitem-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${navIcons[page]}</svg></span><span class="cm-app-chrome__tooltip" aria-hidden="true">${label}</span></a>`;
 }
 
@@ -143,6 +157,8 @@ export function footerHtml(): string {
             <nav aria-label="Footer links">
               <a href="/" data-page-link="inference" data-active="false">Inference</a>
               <a href="/manowar/" data-page-link="manowar" data-active="false">Manowar</a>
+              <a href="/terms/" data-page-link="terms" data-active="false">Terms</a>
+              <a href="/privacy/" data-page-link="privacy" data-active="false">Privacy</a>
               <a href="https://docs.compose.market">Docs</a>
               <a href="https://github.com/compose-market">GitHub</a>
               <a href="https://x.com/composex402">X</a>
@@ -166,7 +182,12 @@ export function lazyScene(root: HTMLElement, options: SceneOptions): Mount & {
     shell?.setAttribute("data-scene", page);
 
     if (stage) {
-      stage.innerHTML = scenePosterHtml(page);
+      const hasPoster = Boolean(stage.querySelector(`[data-scene-poster="${page}"]`));
+      const expectsPoster = page === "inference" || page === "manowar";
+
+      if ((expectsPoster && !hasPoster) || (!expectsPoster && stage.childElementCount > 0)) {
+        stage.innerHTML = scenePosterHtml(page);
+      }
     }
   };
 
@@ -186,6 +207,11 @@ export function lazyScene(root: HTMLElement, options: SceneOptions): Mount & {
       scene?.destroy();
       scene = undefined;
       poster(page);
+
+      // Legal pages skip the WebGL scene — the static CSS backdrop suffices.
+      if (page === "terms" || page === "privacy") {
+        return;
+      }
 
       const loading = page === "inference" ? import("./cube") : import("./scene");
       void loading.then((module) => {

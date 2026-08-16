@@ -1634,9 +1634,11 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     braid = clamp(braid + (braidWant - braid) * (braidWant > braid ? 0.18 : 0.055) * rate, 0, 1);
     line = clamp(line + (lineWant - line) * (lineWant > line ? 0.18 : 0.055) * rate, 0, 1);
     const activeBase = hit?.strength ?? 0;
-    renderer.domElement.dataset.binaryPulseX = nowReduced || grid.w >= 860
-      ? "none"
-      : (grid.w * (0.5 + Math.sin(time * 0.001 * 0.78) * 0.36)).toFixed(1);
+    if (testing) {
+      renderer.domElement.dataset.binaryPulseX = nowReduced || grid.w >= 860
+        ? "none"
+        : (grid.w * (0.5 + Math.sin(time * 0.001 * 0.78) * 0.36)).toFixed(1);
+    }
     const blockActive = nowReduced
       ? 0
       : clamp(activeBase * (grid.w < 700 ? 1.45 : 1.18) + (activeCell ? 0.08 : 0), 0, 1);

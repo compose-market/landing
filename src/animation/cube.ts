@@ -328,6 +328,10 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
   let focusIndex: number | null = null;
   let outputIndex: number | null = null;
   let activeElement: HTMLElement | null = null;
+  let hoveredElement: HTMLElement | null = null;
+  let focusedElement: HTMLElement | null = null;
+  let lastTargetElement: HTMLElement | null = null;
+  let lastTargetIndex: number | null = null;
   let pointerActive = false;
   let pointerEnergy = 0;
   let particleGather = 0;
@@ -444,13 +448,25 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     );
   };
 
-  const nearestCubie = (target: THREE.Vector2): number => {
+  const screenPointForBaseCubie = (index: number): THREE.Vector2 => {
+    projectedPoint.copy(cubies[index]!.base).applyMatrix4(cubeRoot.matrixWorld).project(camera);
+    return new THREE.Vector2(
+      (projectedPoint.x * 0.5 + 0.5) * window.innerWidth,
+      (-projectedPoint.y * 0.5 + 0.5) * window.innerHeight
+    );
+  };
+
+  const nearestCubie = (target: THREE.Vector2, excluded: number | null = null): number => {
     cubeRoot.updateMatrixWorld(true);
     let nearest = 0;
     let nearestDistance = Number.POSITIVE_INFINITY;
 
     for (const cubie of cubies) {
-      const point = screenPointForCubie(cubie.index);
+      if (cubie.index === excluded) {
+        continue;
+      }
+
+      const point = screenPointForBaseCubie(cubie.index);
       const distance = point.distanceToSquared(target);
 
       if (distance < nearestDistance) {
@@ -460,6 +476,22 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     }
 
     return nearest;
+  };
+
+  const cubieForElement = (element: HTMLElement): number => {
+    const excluded = element === lastTargetElement ? null : lastTargetIndex;
+    const rect = element.getBoundingClientRect();
+    return nearestCubie(
+      pointerClient.set(rect.left + rect.width * 0.5, rect.top + rect.height * 0.5),
+      excluded
+    );
+  };
+
+  const railTarget = (target: EventTarget | null): HTMLElement | null => {
+    const node = target instanceof Element
+      ? target.closest<HTMLElement>(".cm-button, .cm-cell, [data-rail-target]")
+      : null;
+    return node && shell.contains(node) ? node : null;
   };
 
   const elementPoint = (element: HTMLElement, from: THREE.Vector2): THREE.Vector2 => {
@@ -493,7 +525,20 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     return `M ${start.x.toFixed(1)} ${start.y.toFixed(1)} V ${lead.toFixed(1)} V ${gate.toFixed(1)} H ${end.x.toFixed(1)} V ${end.y.toFixed(1)}`;
   };
 
-  const createRail = (start: THREE.Vector2, end: THREE.Vector2, direction: RailTrail["direction"]): void => {
+  const retireEgressRails = (): void => {
+    for (const trail of railTrails) {
+      if (trail.direction === "egress") {
+        trail.age = Math.max(trail.age, trail.lifetime * 0.78);
+      }
+    }
+  };
+
+  const createRail = (
+    start: THREE.Vector2,
+    end: THREE.Vector2,
+    direction: RailTrail["direction"],
+    cubieIndex: number | null = null
+  ): void => {
     if (start.distanceTo(end) < 28) {
       return;
     }
@@ -505,6 +550,9 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     const path = railPath(start, end);
 
     group.dataset.direction = direction;
+    if (testing && cubieIndex !== null) {
+      group.dataset.cubieIndex = String(cubieIndex);
+    }
     trace.setAttribute("class", "inference-rail__trace");
     core.setAttribute("class", "inference-rail__core");
     packet.setAttribute("class", "inference-rail__packet");
@@ -572,8 +620,6 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     const centerX = Math.round((width * 0.5) / grid) * grid;
     const centerY = Math.round(sceneCenterY / grid) * grid;
     const mobile = window.innerWidth < 700;
-    const cavityX = mobile ? grid * 2.5 : grid * 4.2;
-    const cavityY = mobile ? grid * 3 : grid * 3.4;
     const paths: Array<{ path: string; strong: boolean }> = [];
     const horizontalRows = mobile ? 10 : 12;
     const verticalColumns = mobile ? 7 : 8;
@@ -581,30 +627,17 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     for (let index = 0; index < horizontalRows; index += 1) {
       const y = Math.round(((index + 1) * height / (horizontalRows + 1)) / grid) * grid;
       const strong = index % 4 === 1;
-
-      if (Math.abs(y - centerY) < cavityY) {
-        const leftEdge = centerX - cavityX - grid;
-        const rightEdge = centerX + cavityX + grid;
-        const routeY = centerY + (index % 2 ? 1 : -1) * (cavityY + grid * (1 + index % 3));
-        paths.push({ path: `M -${grid} ${y} H ${leftEdge} V ${routeY} H ${rightEdge} V ${y} H ${width + grid}`, strong });
-      } else {
-        const gateX = centerX + (index % 2 ? -grid * 3 : grid * 3);
-        const offsetY = index % 2 ? grid : -grid;
-        paths.push({ path: `M -${grid} ${y} H ${gateX} V ${y + offsetY} H ${width + grid}`, strong });
-      }
+      const gateX = centerX + (index % 2 ? -grid * 3 : grid * 3);
+      const offsetY = index % 2 ? grid : -grid;
+      paths.push({ path: `M -${grid} ${y} H ${gateX} V ${y + offsetY} H ${width + grid}`, strong });
     }
 
     for (let index = 0; index < verticalColumns; index += 1) {
       const x = Math.round(((index + 1) * width / (verticalColumns + 1)) / grid) * grid;
-
-      const gateY = centerY + (index % 2 ? -cavityY - grid : cavityY + grid);
+      const gateY = centerY + (index % 2 ? -grid * 3 : grid * 3);
       const offsetX = index % 2 ? grid : -grid;
-      const insideCavity = Math.abs(x - centerX) < cavityX + grid;
-      const routeX = centerX + (index % 2 ? -1 : 1) * (cavityX + grid);
       paths.push({
-        path: insideCavity
-          ? `M ${x} -${grid} V ${centerY - cavityY - grid} H ${routeX} V ${centerY + cavityY + grid} H ${x} V ${height + grid}`
-          : `M ${x} -${grid} V ${gateY} H ${x + offsetX} V ${height + grid}`,
+        path: `M ${x} -${grid} V ${gateY} H ${x + offsetX} V ${height + grid}`,
         strong: index % 3 === 1
       });
     }
@@ -612,13 +645,48 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     paths.forEach(({ path, strong }, index) => createAmbientRail(path, index, strong, mobile ? 1.7 : 1));
   };
 
+  const requestEgress = (demand = 1.8): void => {
+    retireEgressRails();
+    railDemand = demand;
+    lastRail = Number.NEGATIVE_INFINITY;
+  };
+
+  const setElementTarget = (next: HTMLElement | null, launchRail = true, demand = 1.8): boolean => {
+    if (next === activeElement) {
+      return false;
+    }
+
+    retireEgressRails();
+    railDemand = 0;
+    activeElement = next;
+
+    if (!next) {
+      outputIndex = null;
+      return true;
+    }
+
+    outputIndex = cubieForElement(next);
+    lastTargetElement = next;
+    lastTargetIndex = outputIndex;
+    focusIndex = null;
+    hoverIndex = null;
+    pointerActive = true;
+
+    if (launchRail) {
+      requestEgress(demand);
+    }
+
+    return true;
+  };
+
   const clearTouchInteraction = (): void => {
     touchPointerId = null;
     touchReleaseAt = 0;
+    hoveredElement = null;
+    focusedElement = null;
+    setElementTarget(null, false);
     focusIndex = null;
     hoverIndex = null;
-    activeElement = null;
-    outputIndex = null;
     pointerActive = false;
   };
 
@@ -628,26 +696,17 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     }
 
     const movement = targetPointer(event.clientX, event.clientY);
-    const node = event.target instanceof Element
-      ? event.target.closest<HTMLElement>(".cm-button, .cm-cell, .hero-chip, [data-rail-target]")
-      : null;
+    const node = railTarget(event.target);
+    hoveredElement = node;
 
-    if (node && shell.contains(node)) {
-      if (activeElement !== node) {
-        railDemand = Math.max(railDemand, 1.6);
-      }
-
-      activeElement = node;
+    if (node) {
+      setElementTarget(node, true, Math.min(3, 1.6 + movement * 10));
       hoverIndex = null;
       lastExternalPoint.set(event.clientX, event.clientY);
-      const rect = node.getBoundingClientRect();
-      outputIndex = nearestCubie(new THREE.Vector2(rect.left + rect.width * 0.5, rect.top + rect.height * 0.5));
-      railDemand = Math.min(3, railDemand + movement * 10);
       return;
     }
 
-    activeElement = null;
-    outputIndex = null;
+    setElementTarget(null, false);
     const picked = pick(event.clientX, event.clientY);
 
     if (picked !== hoverIndex && picked !== null) {
@@ -672,15 +731,17 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
       touchReleaseAt = performance.now() + 1100;
     }
 
-    const node = event.target instanceof Element
-      ? event.target.closest<HTMLElement>(".cm-button, .cm-cell, .hero-chip, [data-rail-target]")
-      : null;
+    const node = railTarget(event.target);
 
-    if (node && shell.contains(node)) {
-      activeElement = node;
-      const rect = node.getBoundingClientRect();
-      outputIndex = nearestCubie(new THREE.Vector2(rect.left + rect.width * 0.5, rect.top + rect.height * 0.5));
-      railDemand = Math.max(railDemand, 1.8);
+    if (node) {
+      if (touchLike) {
+        focusedElement = node;
+      } else {
+        hoveredElement = node;
+      }
+      if (!setElementTarget(node)) {
+        requestEgress();
+      }
       return;
     }
 
@@ -712,33 +773,35 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
   };
 
   const leave = () => {
+    hoveredElement = null;
     hoverIndex = null;
-    activeElement = null;
-    outputIndex = null;
-    pointerActive = focusIndex !== null;
+    if (activeElement !== focusedElement) {
+      setElementTarget(focusedElement);
+    }
+    pointerActive = focusIndex !== null || focusedElement !== null;
   };
 
   const focusIn = (event: FocusEvent) => {
-    const node = event.target instanceof Element
-      ? event.target.closest<HTMLElement>(".cm-button, .cm-cell, [data-rail-target]")
-      : null;
+    const node = railTarget(event.target);
 
-    if (!node || !shell.contains(node)) {
+    if (!node) {
       return;
     }
 
     const rect = node.getBoundingClientRect();
-    activeElement = node;
+    focusedElement = node;
     pointerActive = true;
     pointerClient.set(rect.left + rect.width * 0.5, rect.top + rect.height * 0.5);
-    outputIndex = nearestCubie(pointerClient);
-    railDemand = Math.max(railDemand, 1.6);
+    setElementTarget(node);
   };
 
   const focusOut = (event: FocusEvent) => {
-    if (event.target === activeElement) {
-      activeElement = null;
-      outputIndex = null;
+    const node = railTarget(event.target);
+    if (node === focusedElement) {
+      focusedElement = null;
+      if (activeElement === node) {
+        setElementTarget(hoveredElement);
+      }
     }
   };
 
@@ -796,9 +859,8 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
       clearTouchInteraction();
     }
 
-    if (activeElement?.isConnected) {
-      const rect = activeElement.getBoundingClientRect();
-      outputIndex = nearestCubie(new THREE.Vector2(rect.left + rect.width * 0.5, rect.top + rect.height * 0.5));
+    if (activeElement && !activeElement.isConnected) {
+      setElementTarget(null, false);
     }
 
     const activeIndex = focusIndex ?? hoverIndex ?? outputIndex;
@@ -826,7 +888,7 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
       const cubePoint = screenPointForCubie(activeIndex);
 
       if (activeElement) {
-        createRail(cubePoint, elementPoint(activeElement, cubePoint), "egress");
+        createRail(cubePoint, elementPoint(activeElement, cubePoint), "egress", activeIndex);
       } else {
         let source = lastExternalPoint.clone();
 
@@ -936,22 +998,25 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
       particleGeometry.attributes.position!.needsUpdate = true;
     }
 
-    let centerX = 0;
-    let centerY = 0;
-    let centerZ = 0;
-    for (let offset = 0; offset < particlePositions.length; offset += 3) {
-      centerX += particlePositions[offset]!;
-      centerY += particlePositions[offset + 1]!;
-      centerZ += particlePositions[offset + 2]!;
-    }
-    centerX /= particleCount;
-    centerY /= particleCount;
-    centerZ /= particleCount;
     let particleSpread = 0;
-    for (let offset = 0; offset < particlePositions.length; offset += 3) {
-      particleSpread += (particlePositions[offset]! - centerX) ** 2
-        + (particlePositions[offset + 1]! - centerY) ** 2
-        + (particlePositions[offset + 2]! - centerZ) ** 2;
+
+    if (testing) {
+      let centerX = 0;
+      let centerY = 0;
+      let centerZ = 0;
+      for (let offset = 0; offset < particlePositions.length; offset += 3) {
+        centerX += particlePositions[offset]!;
+        centerY += particlePositions[offset + 1]!;
+        centerZ += particlePositions[offset + 2]!;
+      }
+      centerX /= particleCount;
+      centerY /= particleCount;
+      centerZ /= particleCount;
+      for (let offset = 0; offset < particlePositions.length; offset += 3) {
+        particleSpread += (particlePositions[offset]! - centerX) ** 2
+          + (particlePositions[offset + 1]! - centerY) ** 2
+          + (particlePositions[offset + 2]! - centerZ) ** 2;
+      }
     }
 
     const lookX = reduced() || !pointerActive ? 0 : pointer.x * 0.11;
@@ -963,7 +1028,7 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
 
     for (const cubie of cubies) {
       const target = cubie.index === activeIndex ? 1 : 0;
-      cubie.activation = damp(cubie.activation, target, target ? 13 : 8, dt);
+      cubie.activation = damp(cubie.activation, target, target ? 13 : 24, dt);
       const eased = cubie.activation * cubie.activation * (3 - 2 * cubie.activation);
       const offset = travel * eased;
       cubie.group.position.copy(cubie.base).addScaledVector(cubie.direction, offset);
@@ -975,7 +1040,9 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
       cubie.edgeMaterial.opacity = 0.62 + eased * 0.34;
       cubie.core.scale.setScalar(1 + eased * 0.09);
 
-      maxOffset = Math.max(maxOffset, offset);
+      if (testing) {
+        maxOffset = Math.max(maxOffset, offset);
+      }
 
       if (cubie.index === activeIndex) {
         focusLight.position.copy(cubie.group.position);
@@ -986,12 +1053,16 @@ export function mountScene(root: ParentNode, options: SceneOptions = {}): SceneM
     const railLight = pointerActive ? Math.min(6, railTrails.length * 0.9 + pointerEnergy * 2.4) : 0;
     focusLight.intensity = damp(focusLight.intensity, activeIndex === null ? railLight : 7 + railLight, 10, dt);
 
-    renderer.domElement.dataset.activeCubie = activeIndex === null ? "none" : String(activeIndex);
-    renderer.domElement.dataset.activeOffset = maxOffset.toFixed(3);
-    renderer.domElement.dataset.activeCircuits = String(railTrails.length);
-    renderer.domElement.dataset.ambientCircuits = String(ambientRails.length);
-    renderer.domElement.dataset.particleSpread = Math.sqrt(particleSpread / particleCount).toFixed(3);
-    renderer.domElement.dataset.railDirection = activeElement ? "egress" : activeIndex === null ? "idle" : "ingress";
+    if (testing) {
+      const outwardCubies = cubies.filter((cubie) => cubie.activation > 0.34).length;
+      renderer.domElement.dataset.activeCubie = activeIndex === null ? "none" : String(activeIndex);
+      renderer.domElement.dataset.activeOffset = maxOffset.toFixed(3);
+      renderer.domElement.dataset.activeCircuits = String(railTrails.length);
+      renderer.domElement.dataset.ambientCircuits = String(ambientRails.length);
+      renderer.domElement.dataset.outwardCubies = String(outwardCubies);
+      renderer.domElement.dataset.particleSpread = Math.sqrt(particleSpread / particleCount).toFixed(3);
+      renderer.domElement.dataset.railDirection = activeElement ? "egress" : activeIndex === null ? "idle" : "ingress";
+    }
     renderer.render(scene, camera);
 
     if (!posterCleared) {
