@@ -1,10 +1,11 @@
 import { dashboardDemo } from "../dashboard";
-import { pollMetrics, type MetricKey } from "../metrics";
+import { pollMetrics } from "../metrics";
 import {
   appUrl,
   deferUntilNear,
   footerHtml,
   heroChip,
+  heroGlyph,
   organism,
   type PageUrls
 } from "../animation/shared";
@@ -15,7 +16,10 @@ export {
   metricDeltas,
   metricValues,
   metricsUrl,
+  modelCount,
+  modelsHealthUrl,
   type MetricKey,
+  type ModelsHealthPayload,
   type MetricsPayload
 } from "../metrics";
 export { Strand, fade, focus, net, pulse, type Hit, type Net, type Vec } from "../animation/model";
@@ -27,13 +31,13 @@ export type MountOptions = import("../animation/shared").PageOptions;
 type PartnerLogo = { src: string; alt: string };
 type PartnerBadge = PartnerLogo & {
   tone: "green" | "blue" | "cyan" | "purple";
+  width: number;
+  height: number;
 };
 
-const icons: Record<MetricKey, string> = {
-  agents: '<path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" />',
+const icons: Record<"volume" | "settlements", string> = {
   volume: '<path d="M20 12v6a2 2 0 0 1-2 2H6a4 4 0 0 1 0-8h14Z" /><path d="M4 12V8a2 2 0 0 1 2-2h12v6" /><path d="M18 16h.01" /><path d="M8 6V4h8v2" />',
-  settlements: '<path d="M15 7a4 4 0 1 1-3.46 6" /><path d="M2 20l7.5-7.5" /><path d="M6 16l2 2" /><path d="M8 14l2 2" />',
-  downloads: '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="M12 22V12" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M8 15l4 4 4-4" />'
+  settlements: '<path d="M15 7a4 4 0 1 1-3.46 6" /><path d="M2 20l7.5-7.5" /><path d="M6 16l2 2" /><path d="M8 14l2 2" />'
 };
 
 const partnerLogos: PartnerLogo[] = [
@@ -84,16 +88,20 @@ const partnerBadges: PartnerBadge[] = [
   {
     src: "/partners/badges/nvidia-badge.webp",
     alt: "NVIDIA Inception Program",
-    tone: "green"
+    tone: "green",
+    width: 824,
+    height: 306
   },
   {
     src: "/partners/badges/microsoft-badge.webp",
     alt: "Microsoft for Startups",
-    tone: "blue"
+    tone: "blue",
+    width: 900,
+    height: 332
   }
 ];
 
-function glyph(key: MetricKey): string {
+function glyph(key: keyof typeof icons): string {
   return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${icons[key]}</svg>`;
 }
 
@@ -104,7 +112,7 @@ function logoTag(logo: PartnerLogo): string {
 function badgeTag(badge: PartnerBadge): string {
   return `
     <div class="cm-partner-badge" data-tone="${badge.tone}">
-      <img src="${badge.src}" alt="${badge.alt}" decoding="async" fetchpriority="low" draggable="false" />
+      <img src="${badge.src}" alt="${badge.alt}" width="${badge.width}" height="${badge.height}" decoding="async" fetchpriority="low" draggable="false" />
     </div>`;
 }
 
@@ -284,8 +292,8 @@ export function render(urls: PageUrls): string {
 
         <section class="panel metrics-panel" aria-label="Network metrics">
           <div class="stats band">
-          <article class="stat cm-glass cm-cell" data-metric="agents" data-tone="cyan">
-            <div class="stat-top"><span class="stat-icon cm-icon" aria-hidden="true">${glyph("agents")}</span><span class="stat-label">Global Agents</span></div>
+          <article class="stat cm-glass cm-cell" data-metric="models" data-tone="cyan">
+            <div class="stat-top"><span class="stat-icon cm-icon" aria-hidden="true">${heroGlyph("model")}</span><span class="stat-label">Models Served</span></div>
             <strong aria-live="polite"></strong>
             <p class="stat-delta" data-delta aria-live="polite"></p>
             <a class="stat-link cm-button cm-button-secondary" href="${keys}">Create your Key</a>
@@ -303,7 +311,7 @@ export function render(urls: PageUrls): string {
             <a class="stat-link cm-button cm-button-secondary" href="${facilitatorDocs}">Facilitator Docs</a>
           </article>
           <article class="stat cm-glass cm-cell" data-metric="downloads" data-tone="violet">
-            <div class="stat-top"><span class="stat-icon cm-icon" aria-hidden="true">${glyph("downloads")}</span><span class="stat-label">SDK Downloads</span></div>
+            <div class="stat-top"><span class="stat-icon cm-icon" aria-hidden="true">${heroGlyph("sdk")}</span><span class="stat-label">SDK Downloads</span></div>
             <strong aria-live="polite"></strong>
             <p class="stat-delta" data-delta aria-live="polite"></p>
             <a class="stat-link cm-button cm-button-secondary" href="https://www.npmjs.com/package/@compose-market/sdk">Build with our SDK</a>

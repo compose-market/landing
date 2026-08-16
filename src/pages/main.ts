@@ -18,10 +18,16 @@ import {
 } from "../animation/shared";
 import * as inference from "./home";
 import * as manowar from "./manowar";
+import * as terms from "./terms";
+import * as privacy from "./privacy";
 import { inject } from "@vercel/analytics";
+import { initLandingConsent } from "../consent";
 
 // Initialize Vercel Web Analytics
 inject();
+
+// Initialize Landing Page Consent Banner
+initLandingConsent();
 
 const appRoot = document.querySelector<HTMLElement>("#app");
 
@@ -32,7 +38,7 @@ if (!appRoot) {
 const root: HTMLElement = appRoot;
 const initialPage = pageFromPath(window.location.pathname);
 
-const pages: Record<PageId, PageModule> = { inference, manowar };
+const pages: Record<PageId, PageModule> = { inference, manowar, terms, privacy };
 
 const urls: PageUrls = (() => {
   const appBase = "https://app.compose.market";
