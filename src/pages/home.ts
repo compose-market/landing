@@ -241,7 +241,7 @@ export function render(urls: PageUrls): string {
         </article>
 
         <div class="hero-mid">
-          <p class="protocol hero-rich" data-rail-target="text">Power your agents with our <strong class="hero-em">live catalog</strong> of <span class="hero-number">700+</span> flagship models: <span class="hero-number">8</span> modalities, <span class="hero-number">20+</span> families, from one single <code class="hero-token">/v1/responses</code> endpoint. Track <strong class="hero-em">every call</strong> through our <strong class="hero-em">Dashboard & Telemetry</strong>, and pay in USDC on <span class="hero-number">4</span> different chains at <strong class="hero-em">the lowest aggregator fee</strong> in the market (<strong class="hero-em">1%</strong>).</p>
+          <p class="protocol hero-rich" data-rail-target="text">Power your agents with our <strong class="hero-em">live catalog</strong> of <span class="hero-number">700+</span> frontier models: <span class="hero-number">8</span> modalities, <span class="hero-number">20+</span> families, from one single <code class="hero-token">/v1/responses</code> endpoint. Track <strong class="hero-em">every call</strong> through our <strong class="hero-em">Dashboard & Telemetry</strong>, and pay in USDC on <span class="hero-number">4</span> different chains at <strong class="hero-em">the lowest aggregator fee</strong> in the market (<strong class="hero-em">1%</strong>).</p>
           <div class="actions" aria-label="Primary actions">
             <a class="action cm-button cm-button-primary primary" href="${keys}">Set your Key <span aria-hidden="true">-&gt;</span></a>
             <a class="action cm-button cm-button-secondary secondary" href="${inferenceDocs}">Inference Docs</a>
@@ -275,7 +275,7 @@ export function render(urls: PageUrls): string {
           <article class="feature cm-glass cm-cell" data-tone="cyan">
             <span class="cm-icon">01</span>
             <h3>Catalog</h3>
-            <p class="cm-copy section-rich">Be the first to access: Compose' live catalog is <strong class="section-em">consistently first to serve SOTA, flagship models</strong>, giving you instant access to <span class="section-number">700+</span> models across <span class="section-number">8</span> modalities.</p>
+            <p class="cm-copy section-rich">Be the first to access: Compose' live catalog is <strong class="section-em">consistently first to serve SOTA, frontier models</strong>, giving you instant access to <span class="section-number">700+</span> models across <span class="section-number">8</span> modalities.</p>
           </article>
           <article class="feature cm-glass cm-cell" data-tone="violet">
             <span class="cm-icon">02</span>
