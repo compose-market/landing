@@ -29,8 +29,7 @@ const MODELS: ModelRow[] = [
   { id: "gpt-5.6-sol", family: "openai", cost: "$1,418.91", calls: "7,826" },
   { id: "kimi-k3", family: "moonshot", cost: "$27.72", calls: "44" },
   { id: "Qwen3.8-Max", family: "alibaba", cost: "$6.72", calls: "162" },
-  { id: "happyhorse-1.0-t2v", family: "alibaba", cost: "$1.94", calls: "2" },
-  { id: "openai/gpt-5.6-sol", family: "openai", cost: "$1.26", calls: "13" }
+  { id: "happyhorse-1.1-t2v", family: "alibaba", cost: "$1.94", calls: "2" },
 ];
 
 interface FeedRow {
